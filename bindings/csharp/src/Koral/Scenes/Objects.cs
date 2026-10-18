@@ -113,6 +113,8 @@ public sealed unsafe partial class Input
 {
     internal readonly IntPtr Native;
     internal Input(IntPtr native) => Native = native;
+    /// <summary>The input a library built on Koral hands over, as a <c>KoralInput*</c>: an engine's, for the scripts it runs.</summary>
+    public static Input Of(IntPtr native) => native != IntPtr.Zero ? new Input(native) : throw new ArgumentException("there is no input there", nameof(native));
 
     public const int MaxGamepads = 4;
 

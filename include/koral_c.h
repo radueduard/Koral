@@ -708,6 +708,9 @@ KORAL_API void koral_cmd_push_constant(KoralCommandBuffer* commands, const char*
 KORAL_API void koral_cmd_bind(KoralCommandBuffer* commands, const char* name, KoralResource* resource, KoralSampler* sampler);
 /** PushConstant(name, index): the index into the uint @p name, and its resource into the uses of what follows. */
 KORAL_API void koral_cmd_push_index(KoralCommandBuffer* commands, const char* name, KoralDescriptorIndex index);
+/** PushConstant(name, resource): @p resource (an image, image view, buffer, sampler or acceleration structure) as its
+ *  bindless index, asked for on the way, into the uint @p name — which table, from its usage and the bound pipeline. */
+KORAL_API void koral_cmd_push_resource(KoralCommandBuffer* commands, const char* name, KoralResource* resource);
 /** Uses(index), and Uses(resource, access) for a buffer, image or image view (@p access a kor::ResourceAccess). */
 KORAL_API void koral_cmd_uses_index(KoralCommandBuffer* commands, KoralDescriptorIndex index);
 KORAL_API void koral_cmd_uses(KoralCommandBuffer* commands, KoralResource* resource, uint32_t access);

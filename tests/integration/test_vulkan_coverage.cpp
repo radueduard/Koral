@@ -260,6 +260,39 @@ TEST_F(GpuTest, GenerateMipmapsRuns) {
     SUCCEED();
 }
 
+// Every level GenerateMipmaps makes is read back whole by a copy that names only the level: its extent, left out,
+// is that level's. (It was the first level's, which no buffer the size of a later level holds: the copy was refused.)
+TEST_F(GpuTest, EachMipLevelIsReadBackWhole) {
+    auto image = Image::Builder{}
+                     .SetType(Image::Type::e2D)
+                     .SetFormat(Image::Format::eRGBA8_UNORM)
+                     .SetExtent(kor::UVec2{8, 8})
+                     .SetMipLevels(4)
+                     .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
+                     .Build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.ClearColorImage(image, kor::Vec4{0.25f, 0.5f, 0.75f, 1.f});
+        cb.GenerateMipmaps(image);
+    }, CommandBuffer::Usage::eGraphics).Wait();
+
+    for (kor::u32 level = 0; level < 4; ++level) {
+        const kor::u32 side = 8u >> level;
+        auto readback = Buffer::RawBuilder{}.SetRawSize(static_cast<kor::i64>(side * side * 4))
+                            .SetUsage(Buffer::Usage::eTransferDst).SetType(Buffer::Type::eReadback).Build();
+        auto done = CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+            cb.CopyImageToBuffer(image, readback, kor::Copy{ .imageMipLevel = level });
+        }, CommandBuffer::Usage::eTransfer);
+        done.Wait();
+        const auto texels = readback->Read<kor::U8Vec4>(side * side);
+        ASSERT_EQ(texels.size(), static_cast<std::size_t>(side * side)) << "level " << level;
+        for (const auto& texel : texels) {
+            EXPECT_NEAR(texel.x, 64, 1) << "level " << level;
+            EXPECT_NEAR(texel.y, 128, 1) << "level " << level;
+            EXPECT_NEAR(texel.z, 191, 1) << "level " << level;
+        }
+    }
+}
+
 // Image-to-image blit (down-scale) between two separate images.
 TEST_F(GpuTest, BlitBetweenImages) {
     auto src = makeImage(kor::Flags(Image::Usage::eTransferSrc) | Image::Usage::eTransferDst);

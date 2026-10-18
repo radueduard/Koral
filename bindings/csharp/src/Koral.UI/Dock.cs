@@ -90,7 +90,7 @@ public sealed record DockStyle
 }
 
 /// <summary>Where a panel is docked: a side's stripe, or the middle.</summary>
-public enum DockArea { Left, Right, BottomLeft, BottomRight, Center }
+public enum DockArea { Left, Right, BottomLeft, BottomRight, Center, CenterRight }
 
 /// <summary>kui::DockOptions.</summary>
 public sealed record DockOptions

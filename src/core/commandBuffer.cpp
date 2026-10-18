@@ -1564,6 +1564,18 @@ namespace kor
     CommandBuffer& CommandBuffer::PushConstantBlock(const void* data, const kor::u32 size, const kor::u32 offset)
     {
         if (_failed) return *this;
+        // Bytes that land on a Slang `T.Handle` are an index the shader will follow, whoever laid them out —
+        // a whole struct pushed at once, a block from another language: its resource joins the uses of what
+        // follows, exactly as a handle pushed by name does. Only a handle says so; a plain uint could be anything.
+        if (const auto* pipeline = BoundPipeline(); pipeline && data) {
+            for (const auto& [member, field] : pipeline->PushConstants()) {
+                if (field.handle == 0 || field.handle == Shader::PushConstantField::NoTable || field.count != 1) continue;
+                if (field.offset < offset || field.offset + sizeof(kor::u32) > offset + size) continue;
+                kor::u32 index = 0;
+                std::memcpy(&index, static_cast<const std::byte*>(data) + (field.offset - offset), sizeof(index));
+                _state.pushedHandles.insert_or_assign(member, DescriptorIndex{ index, static_cast<BindlessKind>(field.handle) });
+            }
+        }
         return DoPushConstantBlock(data, size, offset);
     }
 
@@ -2382,8 +2394,133 @@ namespace kor
             return RecordError(Error{ .code = ErrorCode::eInvalidArgument,
                 .message = std::format("The bindless index pushed as '{}' is invalid: the call that made it said why.", name),
                 .where = where });
+        // A Slang `T.Handle` says itself which table it indexes, and is two words wide.
+        const auto* pipeline = BoundPipeline();
+        if (const auto* member = pipeline ? pipeline->FindPushConstant(name) : nullptr; member && member->handle != 0) {
+            if (member->handle == Shader::PushConstantField::NoTable)
+                return RecordError(Error{ .code = ErrorCode::ePushConstantMismatch,
+                    .message = std::format("Push constant '{}' is a handle to a kind of descriptor no bindless table holds "
+                                           "(a texel buffer, or a combined image-sampler). Use a Texture and a SamplerState "
+                                           "handle, or a StructuredBuffer.", name),
+                    .where = where });
+            const auto declared = static_cast<BindlessKind>(member->handle);
+            if (declared != handle.kind)
+                return RecordError(Error{ .code = ErrorCode::ePushConstantMismatch,
+                    .message = std::format("Push constant '{}' is a handle to a {}, but a {} index was pushed into it.",
+                                           name, BindlessKindName(declared), BindlessKindName(handle.kind)),
+                    .where = where });
+            _state.pushedHandles.insert_or_assign(std::string(name), handle);
+            const kor::UVec2 words{ handle.index, 0 };
+            return PushConstant(name, &words, sizeof(words), ShapeOf<kor::UVec2>(), where);
+        }
         _state.pushedHandles.insert_or_assign(std::string(name), handle);
         return PushConstant(name, &handle.index, sizeof(handle.index), ShapeOf<kor::u32>(), where);
+    }
+
+    std::optional<BindlessKind> CommandBuffer::PushedKind(const std::string_view name, const char* what,
+                                                          const bool canBeFirst, const BindlessKind first,
+                                                          const bool canBeSecond, const BindlessKind second,
+                                                          const char* askFirst, const char* askSecond,
+                                                          const std::source_location where)
+    {
+        // A Slang `T.Handle` names its table; whether the resource can be in it, kor::Bindless says.
+        if (const auto* pipeline = BoundPipeline()) {
+            if (const auto* member = pipeline->FindPushConstant(name);
+                member && member->handle != 0 && member->handle != Shader::PushConstantField::NoTable) {
+                const auto declared = static_cast<BindlessKind>(member->handle);
+                if (declared == first || declared == second) return declared;
+                RecordError(Error{ .code = ErrorCode::ePushConstantMismatch,
+                    .message = std::format("Push constant '{}' is a handle to a {}, and the {} pushed cannot be one.",
+                                           name, BindlessKindName(declared), what),
+                    .where = where });
+                return std::nullopt;
+            }
+        }
+        if (canBeFirst != canBeSecond) return canBeFirst ? first : second;
+        if (!canBeFirst) {
+            RecordError(Error{ .code = ErrorCode::eInvalidArgument,
+                .message = std::format("The {} pushed as '{}' can be neither a {} nor a {}: it was made without the usage "
+                                       "either needs, so a shader cannot reach it by index.",
+                                       what, name, BindlessKindName(first), BindlessKindName(second)),
+                .where = where });
+            return std::nullopt;
+        }
+        // Both would do: the tables the shader actually reads say which it means.
+        if (const auto* pipeline = BoundPipeline()) {
+            const auto& tables = pipeline->BindlessBindings();
+            const bool readsFirst = tables.contains(BindlessBinding(first));
+            const bool readsSecond = tables.contains(BindlessBinding(second));
+            if (readsFirst != readsSecond) return readsFirst ? first : second;
+        }
+        RecordError(Error{ .code = ErrorCode::eInvalidArgument,
+            .message = std::format("The {} pushed as '{}' could be a {} or a {}, and the bound pipeline does not settle "
+                                   "which. Push kor::Bindless::{}(...) or kor::Bindless::{}(...) instead.",
+                                   what, name, BindlessKindName(first), BindlessKindName(second), askFirst, askSecond),
+            .where = where });
+        return std::nullopt;
+    }
+
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const ResourceRef<const Image>& image,
+                                               const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(image, "image")) return *this;
+        const auto usage = image->UsageFlags();
+        const auto kind = PushedKind(name, "image",
+                                     static_cast<bool>(usage & Image::Usage::eSampled), BindlessKind::eSampledImage,
+                                     static_cast<bool>(usage & Image::Usage::eStorage), BindlessKind::eStorageImage,
+                                     "Sampled", "Storage", where);
+        if (!kind) return *this;
+        const auto shape = image->NaturalShape();
+        return PushConstant(name, *kind == BindlessKind::eSampledImage ? Bindless::Sampled(image, shape)
+                                                                       : Bindless::Storage(image, shape), where);
+    }
+
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const ResourceRef<const ImageView>& view,
+                                               const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(view, "image view")) return *this;
+        const auto image = view->SourceImage();
+        if (Reject(image, "image")) return *this;
+        const auto usage = image->UsageFlags();
+        const auto kind = PushedKind(name, "image view",
+                                     static_cast<bool>(usage & Image::Usage::eSampled), BindlessKind::eSampledImage,
+                                     static_cast<bool>(usage & Image::Usage::eStorage), BindlessKind::eStorageImage,
+                                     "Sampled", "Storage", where);
+        if (!kind) return *this;
+        return PushConstant(name, *kind == BindlessKind::eSampledImage ? Bindless::Sampled(view) : Bindless::Storage(view), where);
+    }
+
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const ResourceRef<const Buffer>& buffer,
+                                               const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(buffer, "buffer")) return *this;
+        const auto usage = buffer->UsageFlags();
+        const auto kind = PushedKind(name, "buffer",
+                                     static_cast<bool>(usage & Buffer::Usage::eStorage), BindlessKind::eStorageBuffer,
+                                     static_cast<bool>(usage & Buffer::Usage::eUniform), BindlessKind::eUniformBuffer,
+                                     "StorageBuffer", "UniformBuffer", where);
+        if (!kind) return *this;
+        return PushConstant(name, *kind == BindlessKind::eStorageBuffer ? Bindless::StorageBuffer(buffer)
+                                                                        : Bindless::UniformBuffer(buffer), where);
+    }
+
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const ResourceRef<const Sampler>& sampler,
+                                               const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(sampler, "sampler")) return *this;
+        return PushConstant(name, Bindless::Sampler(sampler), where);
+    }
+
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const ResourceRef<const AccelerationStructure>& structure,
+                                               const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(structure, "acceleration structure")) return *this;
+        return PushConstant(name, Bindless::AccelerationStructure(structure), where);
     }
 
     void CommandBuffer::AppendIndirectUses(std::vector<ResourceUse>& uses) const

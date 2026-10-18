@@ -696,6 +696,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_push_constant(IntPtr commands, string? name, void* data, uint bytes, KoralValueShape* shape);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_bind(IntPtr commands, string? name, IntPtr resource, IntPtr sampler);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_push_index(IntPtr commands, string? name, KoralDescriptorIndex index);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_push_resource(IntPtr commands, string? name, IntPtr resource);
     [LibraryImport(Library)] internal static partial void koral_cmd_uses_index(IntPtr commands, KoralDescriptorIndex index);
     [LibraryImport(Library)] internal static partial void koral_cmd_uses(IntPtr commands, IntPtr resource, uint access);
     [LibraryImport(Library)] internal static partial void koral_cmd_copy_descriptors(IntPtr commands, IntPtr source, ulong source_offset, IntPtr heap, uint first_slot, uint count);

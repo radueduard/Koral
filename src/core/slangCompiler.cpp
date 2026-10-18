@@ -4,6 +4,8 @@
 
 #include "slangCompiler.h"
 
+#include <algorithm>
+#include <optional>
 #include <vector>
 
 #include <slang.h>
@@ -155,13 +157,35 @@ namespace kor
         // drops them: reflection reports nothing for them, and nothing reaches the SPIR-V either.
         // User attributes are the one annotation it keeps, argument string and all. @see semantics.h
         if (slang::ProgramLayout* layout = linked->getLayout(0, diagnostics.writeRef())) {
+            const auto annotations = [&](slang::VariableLayoutReflection* field) {
+                slang::VariableReflection* variable = field->getVariable();
+                if (!variable) return;
+                for (unsigned a = 0; a < variable->getUserAttributeCount(); ++a) {
+                    slang::UserAttribute* attribute = variable->getUserAttributeByIndex(a);
+                    const char* name = attribute ? attribute->getName() : nullptr;
+                    if (!name) continue;
+
+                    // The attribute's own name is the module: [camera("VIEW_MATRIX")] is
+                    // the camera module's VIEW_MATRIX, and the module ships the attribute
+                    // it is named by. Anything with a string argument is read this way, so
+                    // a new module needs no change here.
+                    std::size_t length = 0;
+                    if (const char* value = attribute->getArgumentValueString(0, &length)) {
+                        std::string semantic(value, length);
+                        std::erase(semantic, '"');   // the argument arrives quoted
+                        result.fieldSemantics.emplace(
+                            field->getName(), SlangCompileResult::FieldSemantic{ name, std::move(semantic) });
+                    }
+                }
+            };
             const auto collect = [&](auto&& self, slang::TypeLayoutReflection* typeLayout) -> void {
                 if (!typeLayout) return;
 
-                // Unwrap the container a block arrives in — ConstantBuffer<T>, ParameterBlock<T> —
-                // until the struct itself is in hand.
+                // Unwrap the container a block arrives in — ConstantBuffer<T>, ParameterBlock<T>, and the
+                // element of a StructuredBuffer<T> — until the struct itself is in hand.
                 while (typeLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer ||
-                       typeLayout->getKind() == slang::TypeReflection::Kind::ParameterBlock) {
+                       typeLayout->getKind() == slang::TypeReflection::Kind::ParameterBlock ||
+                       typeLayout->getKind() == slang::TypeReflection::Kind::Resource) {
                     typeLayout = typeLayout->getElementTypeLayout();
                     if (!typeLayout) return;
                 }
@@ -170,33 +194,87 @@ namespace kor
                 for (unsigned f = 0; f < typeLayout->getFieldCount(); ++f) {
                     slang::VariableLayoutReflection* field = typeLayout->getFieldByIndex(f);
                     if (!field || !field->getName()) continue;
-
-                    if (slang::VariableReflection* variable = field->getVariable()) {
-                        for (unsigned a = 0; a < variable->getUserAttributeCount(); ++a) {
-                            slang::UserAttribute* attribute = variable->getUserAttributeByIndex(a);
-                            const char* name = attribute ? attribute->getName() : nullptr;
-                            if (!name) continue;
-
-                            // The attribute's own name is the module: [camera("VIEW_MATRIX")] is
-                            // the camera module's VIEW_MATRIX, and the module ships the attribute
-                            // it is named by. Anything with a string argument is read this way, so
-                            // a new module needs no change here.
-                            std::size_t length = 0;
-                            if (const char* value = attribute->getArgumentValueString(0, &length)) {
-                                std::string semantic(value, length);
-                                std::erase(semantic, '"');   // the argument arrives quoted
-                                result.fieldSemantics.emplace(
-                                    field->getName(), SlangCompileResult::FieldSemantic{ name, std::move(semantic) });
-                            }
-                        }
-                    }
+                    annotations(field);
                     self(self, field->getTypeLayout());   // nested structs annotate too
                 }
             };
 
             for (unsigned i = 0; i < layout->getParameterCount(); ++i) {
-                if (slang::VariableLayoutReflection* parameter = layout->getParameterByIndex(i))
+                if (slang::VariableLayoutReflection* parameter = layout->getParameterByIndex(i)) {
+                    // A parameter itself is annotated by name as a field is: [entity("PER_INSTANCE")] on a buffer.
+                    if (parameter->getName()) annotations(parameter);
                     collect(collect, parameter->getTypeLayout());
+                }
+            }
+        }
+
+        // The `T.Handle` push constants, and which bindless table each indexes.
+        //
+        // A DescriptorHandle is laid out as a uint2 — that is all the SPIR-V, and the layout reflection,
+        // keep of it. The field's declared type still names it, and the resource inside says the table.
+        if (slang::ProgramLayout* layout = linked->getLayout(0, diagnostics.writeRef())) {
+            const auto kindOf = [](slang::TypeReflection* type) -> std::optional<BindlessKind> {
+                if (!type) return std::nullopt;
+                ComPtr<ISlangBlob> name;
+                if (SLANG_FAILED(type->getFullName(name.writeRef())) || !name) return std::nullopt;
+                const std::string_view full(static_cast<const char*>(name->getBufferPointer()), name->getBufferSize());
+                constexpr std::string_view handle = "DescriptorHandle<";
+                if (!full.starts_with(handle)) return std::nullopt;
+                const auto inner = full.substr(handle.size());
+                const auto is = [&](std::initializer_list<std::string_view> prefixes) {
+                    return std::ranges::any_of(prefixes, [&](const std::string_view p) { return inner.starts_with(p); });
+                };
+                // Order matters: "RWTexture" before "Texture", and so on.
+                if (is({ "SamplerState", "SamplerComparisonState" })) return BindlessKind::eSampler;
+                if (is({ "RWTexture", "RasterizerOrderedTexture" })) return BindlessKind::eStorageImage;
+                if (is({ "Texture" })) return BindlessKind::eSampledImage;
+                if (is({ "ConstantBuffer" })) return BindlessKind::eUniformBuffer;
+                if (is({ "StructuredBuffer", "RWStructuredBuffer", "ByteAddressBuffer", "RWByteAddressBuffer",
+                         "AppendStructuredBuffer", "ConsumeStructuredBuffer", "RasterizerOrderedStructuredBuffer",
+                         "RasterizerOrderedByteAddressBuffer" })) return BindlessKind::eStorageBuffer;
+                if (is({ "RaytracingAccelerationStructure" })) return BindlessKind::eAccelerationStructure;
+                return BindlessKind::eNone;   // a handle to something with no table: a texel buffer, a combined sampler
+            };
+
+            const auto collect = [&](auto&& self, slang::TypeLayoutReflection* typeLayout, const std::string& prefix) -> void {
+                while (typeLayout && (typeLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer ||
+                                      typeLayout->getKind() == slang::TypeReflection::Kind::ParameterBlock))
+                    typeLayout = typeLayout->getElementTypeLayout();
+                if (!typeLayout || typeLayout->getKind() != slang::TypeReflection::Kind::Struct) return;
+
+                for (unsigned f = 0; f < typeLayout->getFieldCount(); ++f) {
+                    slang::VariableLayoutReflection* field = typeLayout->getFieldByIndex(f);
+                    if (!field || !field->getName()) continue;
+                    const std::string path = prefix + field->getName();
+                    slang::TypeReflection* declared = field->getVariable() ? field->getVariable()->getType() : nullptr;
+                    while (declared && declared->getKind() == slang::TypeReflection::Kind::Array)
+                        declared = declared->getElementType();
+                    if (const auto kind = kindOf(declared)) {
+                        result.pushHandles.emplace(path, *kind);
+                        continue;
+                    }
+                    slang::TypeLayoutReflection* inner = field->getTypeLayout();
+                    while (inner && inner->getKind() == slang::TypeReflection::Kind::Array)
+                        inner = inner->getElementTypeLayout();
+                    self(self, inner, path + ".");
+                }
+            };
+
+            // A push-constant block's fields are named bare ("output"); an entry point's `uniform` parameters
+            // become one block of their own, its members named by the parameter ("push.output").
+            for (unsigned i = 0; i < layout->getParameterCount(); ++i) {
+                if (slang::VariableLayoutReflection* parameter = layout->getParameterByIndex(i))
+                    collect(collect, parameter->getTypeLayout(), "");
+            }
+            if (slang::EntryPointReflection* ep = layout->getEntryPointByIndex(0)) {
+                for (unsigned p = 0; p < ep->getParameterCount(); ++p) {
+                    slang::VariableLayoutReflection* parameter = ep->getParameterByIndex(p);
+                    if (!parameter || !parameter->getName()) continue;
+                    result.entryParameters.emplace(parameter->getName());
+                    slang::TypeReflection* declared = parameter->getVariable() ? parameter->getVariable()->getType() : nullptr;
+                    if (const auto kind = kindOf(declared)) { result.pushHandles.emplace(parameter->getName(), *kind); continue; }
+                    collect(collect, parameter->getTypeLayout(), std::string(parameter->getName()) + ".");
+                }
             }
         }
 

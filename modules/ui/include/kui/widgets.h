@@ -540,6 +540,12 @@ namespace kui
     };
     /** @brief @p children laid out by @p layout: it measures each with the constraints it likes, places it, and returns its own size. */
     KUI_API Widget CustomLayout(std::function<kor::Vec2(LayoutContext&, const BoxConstraints&)> layout, std::vector<Widget> children);
+    /**
+     * @brief @p children side by side, as many to a line as fit the width it is given, and the rest on the lines
+     *        under: @p spacing between two of a line, @p runSpacing between one line and the next. Each child is as
+     *        big as it likes, and no wider than the whole. Without a bounded width it is one line.
+     */
+    KUI_API Widget Wrap(std::vector<Widget> children, float spacing = 0.f, float runSpacing = 0.f);
 
     /**
      * @brief Takes no room; while @p open, @p popup is shown over everything, at the left of whatever this is
@@ -784,6 +790,8 @@ namespace kui
         std::function<void()> onSelected;
         bool enabled = true;
         bool separator = false;
+        /// Not empty: a submenu. Pressed, it opens in place, its lines under it, indented; pressed again, it closes.
+        std::vector<MenuItem> items;
     };
     /** @brief @p child, with a menu of @p items that opens where the right button is pressed on it. */
     KUI_API Widget ContextMenu(std::vector<MenuItem> items, Widget child);

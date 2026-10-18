@@ -458,6 +458,53 @@ target_compile_definitions(Koral_Runtime PRIVATE
         SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/")
 
 # ---------------------------------------------------------------------------
+# Editor tooling shipped with the SDK
+#
+# What an editor needs to check a shader the way the runtime compiles it. An editor's own checker
+# does not know where Koral looks for an `#include` or an `import`, and reports every one of them.
+#
+# koral-glsld: a GLSL language server on the same glslang and settings as Shader::Compile, which
+# finds a file's search roots itself (koral.json, the project's .koral/shaders links, this SDK's
+# shaders) — so one registration in an IDE serves every project. See tools/glsld/main.cpp.
+# ---------------------------------------------------------------------------
+add_executable(koral-glsld tools/glsld/main.cpp)
+target_link_libraries(koral-glsld PRIVATE
+        glslang::glslang
+        glslang::glslang-default-resource-limits
+        reflectcpp::reflectcpp)
+if(KORAL_SHADERS_PATH)
+    # A dev build finds the engine's shaders in the source tree, as the runtime's dev fallback does.
+    target_compile_definitions(koral-glsld PRIVATE KORAL_GLSLD_SOURCE_SHADERS="${KORAL_SHADERS_PATH}")
+endif()
+install(TARGETS koral-glsld RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# koral-slangd: the slangd installed beside it, with its `{}` answers made `null` — LSP4IJ (JetBrains)
+# rejects `{}` where the protocol says null-or-list. What a JetBrains IDE runs; VS Code runs slangd.
+add_executable(koral-slangd tools/slangd/main.cpp)
+target_link_libraries(koral-slangd PRIVATE reflectcpp::reflectcpp)
+install(TARGETS koral-slangd RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# The Slang grammar, from the Slang VS Code extension (see its NOTICE), as a bundle JetBrains' TextMate
+# support reads: with slangd run through LSP4IJ, no IDE needs a Slang plugin.
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/tools/editor/slang-textmate
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/editor)
+
+# slangd: Slang's language server, from the same vcpkg build as the compiler libKoral embeds, so the
+# editor accepts exactly the Slang the runtime does. It links only libslang-compiler, which the
+# bundling below already ships; its RUNPATH ($ORIGIN/../lib) finds it from bin/ as-is, and on Windows
+# the DLLs land beside it.
+set(KORAL_SLANGD "${KORAL_VCPKG_PREFIX}/tools/shader-slang/slangd${CMAKE_EXECUTABLE_SUFFIX}")
+if(EXISTS "${KORAL_SLANGD}")
+    install(PROGRAMS "${KORAL_SLANGD}" DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(APPLE)
+        install(CODE "execute_process(COMMAND install_name_tool -add_rpath @executable_path/../${CMAKE_INSTALL_LIBDIR}
+                \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/slangd\" ERROR_QUIET)")
+    endif()
+else()
+    message(WARNING "slangd not found at ${KORAL_SLANGD}: the SDK will ship without the Slang language server")
+endif()
+
+# ---------------------------------------------------------------------------
 # Export & install — generates KORAL_RELOADEDConfig.cmake into cmake/
 # ---------------------------------------------------------------------------
 
@@ -993,10 +1040,12 @@ if(KORAL_BUILD_MODULES)
     # already looks (beside the executable on Windows; via the $ORIGIN/.. that modules/*/CMakeLists
     # sets on ELF and Mach-O), and it means a library both a module and the engine need — spdlog,
     # zlib — is installed once rather than once per consumer.
+    # Every module the SDK stages: one built on another (gui-extras on koral-ui) has it as a dependency, and one
+    # left off this list would be bundled again into lib/ beside its own lib/modules copy — and never updated there.
     set(KORAL_MODULE_TARGETS
             koral-camera koral-gui-extras koral-mesh
             koral-image-import koral-image-export koral-image-compress
-            koral-model-import)
+            koral-model-import koral-ui koral-net)
 
     set(KORAL_MODULE_BINARIES "")
     foreach(target IN LISTS KORAL_MODULE_TARGETS)

@@ -50,8 +50,21 @@ namespace kor
 
     const Pipeline::PushConstantMember* Pipeline::FindPushConstant(const std::string_view name) const
     {
-        const auto it = _pushConstants.find(name);
-        return it == _pushConstants.end() ? nullptr : &it->second;
+        if (const auto it = _pushConstants.find(name); it != _pushConstants.end()) return &it->second;
+
+        // A field of an entry point's `uniform` parameter is named under it ("push.color"); asked for by its own
+        // name ("color"), it is found when exactly one parameter has it — so a struct written field by field needs
+        // no idea how the shader passes it in. Only a parameter: a struct nested in a block is addressed by its path.
+        const PushConstantMember* found = nullptr;
+        for (const auto& [declared, member] : _pushConstants) {
+            if (declared.size() <= name.size() + 1 || !declared.ends_with(name)) continue;
+            const std::string_view prefix(declared.data(), declared.size() - name.size() - 1);
+            if (declared[prefix.size()] != '.' || prefix.find_first_of(".[") != std::string_view::npos) continue;
+            if (const auto owner = _pushConstants.find(prefix); owner == _pushConstants.end() || !owner->second.parameter) continue;
+            if (found) return nullptr;   // in two structs: ambiguous, so the caller lists both
+            found = &member;
+        }
+        return found;
     }
 
     const Shader::PushConstant& Pipeline::PushConstantRange(const kor::u32 offset) const
@@ -385,7 +398,8 @@ namespace kor
                     .offset = member.offset, .size = member.size, .stages = pushConstant.stages,
                     .scalar = member.scalar, .rows = member.rows, .columns = member.columns,
                     .count = member.count, .arrayStride = member.arrayStride,
-                    .matrixStride = member.matrixStride, .aggregate = member.aggregate });
+                    .matrixStride = member.matrixStride, .aggregate = member.aggregate,
+                    .handle = member.handle, .parameter = member.parameter });
             }
         }
 

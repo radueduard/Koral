@@ -118,6 +118,39 @@ TEST_F(GpuTest, AShaderWithoutBindingsReflectsItsParametersAndConstants) {
     EXPECT_NE(std::ranges::find(pushed, "bias"), pushed.end());
 }
 
+// A StructuredBuffer of a struct: the buffer's own annotation, and its element's fields — where each is within an
+// element, how far apart elements are, and what each is annotated with. What fills one an element at a time needs.
+TEST_F(GpuTest, AStructuredBuffersElementAndItsAnnotationsAreReflected) {
+    AddTestShaders();
+    const auto shader = Shader::Builder{}.SetEntryPoint("annotatedElements", "computeMain").GetOrBuild();
+    ASSERT_TRUE(shader.Valid()) << shader.Failure()->History();
+
+    const auto* elements = Find(*shader, "elements");
+    ASSERT_NE(elements, nullptr);
+    EXPECT_EQ(elements->semanticNamespace, "thing");
+    EXPECT_EQ(elements->semantic, "EACH");
+    EXPECT_EQ(elements->elementStride, 80u) << "a float4x4, a float3 and a uint: 64 + 12 + 4, a whole number of 16 already";
+    ASSERT_EQ(elements->elementMembers.size(), 3u);
+    const auto& placed = elements->elementMembers[0];
+    EXPECT_EQ(placed.name, "placed");
+    EXPECT_EQ(placed.offset, 0u);
+    EXPECT_EQ(placed.size, 64u);
+    EXPECT_EQ(placed.semanticNamespace, "thing");
+    EXPECT_EQ(placed.semantic, "WHERE");
+    const auto& tint = elements->elementMembers[1];
+    EXPECT_EQ(tint.name, "tint");
+    EXPECT_EQ(tint.offset, 64u);
+    EXPECT_EQ(tint.rows, 3u);
+    EXPECT_TRUE(tint.semantic.empty()) << "not annotated";
+    EXPECT_EQ(elements->elementMembers[2].offset, 76u);
+    EXPECT_EQ(elements->elementMembers[2].scalar, 2u) << "a uint";
+
+    const auto* output = Find(*shader, "output");
+    ASSERT_NE(output, nullptr);
+    EXPECT_TRUE(output->semantic.empty());
+    EXPECT_TRUE(output->elementMembers.empty()) << "an array of floats has no struct to describe";
+}
+
 // A mesh shader compiles to the EXT execution model, which is not the NV one under another name:
 // taken for an unknown stage, no mesh shader written in Slang could be loaded at all.
 TEST_F(GpuTest, AMeshShaderIsKnownForOne) {

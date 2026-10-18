@@ -19,6 +19,8 @@
 
 # IDE
 /.idea/
+# Links an IDE runs the editor tools through (.koral/bin → a build tree), machine-local like .idea
+/.koral/
 /.vs/
 /.vscode/
 

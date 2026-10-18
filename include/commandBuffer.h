@@ -778,9 +778,49 @@ namespace kor
          * @brief Pushes a bindless index into the `uint` the shader calls @p name — and with it, the
          *        resource behind it into the uses of the draws that follow, so they are synchronised
          *        for it as for a bound one.
+         *
+         * @p name may also be a Slang descriptor handle (`Texture2D.Handle albedo;`); the index is then
+         * written as the handle's first word, and refused unless it is into the table the handle names.
          */
         CommandBuffer& PushConstant(std::string_view name, DescriptorIndex handle,
                                     std::source_location where = std::source_location::current());
+
+        /**
+         * @name Pushing a resource as its bindless index
+         *
+         * The resource itself, into the `uint` the shader calls @p name: its kor::Bindless index is
+         * asked for on the way (the same one every time, for as long as the resource lives), and it is
+         * synchronised for exactly as a pushed DescriptorIndex is. Nothing to keep beside the resource:
+         *
+         * @code
+         * cb.BindComputePipeline(circle)
+         *   .PushConstant("push.output", image)        // `uint output;` read as kor::image2D(push.output)
+         *   .Dispatch(128, 128);
+         * @endcode
+         *
+         * Into a Slang descriptor handle (`RWTexture2D<float4>.Handle output;`) the handle's type says
+         * which table, and a resource that cannot be in it is refused. Into a `uint`, which table the
+         * index is into follows from what the resource can be: an image made with only
+         * Image::Usage::eStorage is a storage image, a buffer with only Buffer::Usage::eUniform a uniform
+         * buffer. One that can be either is settled by which tables the bound pipeline reads; when it
+         * reads both, the push is refused as ambiguous — say which with Bindless::Sampled or
+         * Bindless::Storage (Bindless::StorageBuffer, Bindless::UniformBuffer) and push that.
+         *
+         * An image is viewed as its Image::NaturalShape; push a view for any other. A per-frame resource
+         * has no one index and is refused, as by kor::Bindless.
+         */
+        ///@{
+        CommandBuffer& PushConstant(std::string_view name, const ResourceRef<const Image>& image,
+                                    std::source_location where = std::source_location::current());
+        CommandBuffer& PushConstant(std::string_view name, const ResourceRef<const ImageView>& view,
+                                    std::source_location where = std::source_location::current());
+        CommandBuffer& PushConstant(std::string_view name, const ResourceRef<const Buffer>& buffer,
+                                    std::source_location where = std::source_location::current());
+        CommandBuffer& PushConstant(std::string_view name, const ResourceRef<const Sampler>& sampler,
+                                    std::source_location where = std::source_location::current());
+        CommandBuffer& PushConstant(std::string_view name, const ResourceRef<const AccelerationStructure>& structure,
+                                    std::source_location where = std::source_location::current());
+        ///@}
 
         // ---- Descriptor heap ------------------------------------------------------------------
 
@@ -1702,6 +1742,15 @@ namespace kor
 
         /** @brief Whichever pipeline is bound, of the three kinds, or nullptr when none is. */
         [[nodiscard]] const Pipeline* BoundPipeline() const;
+
+        /**
+         * @brief Which of two tables a resource pushed by name gets its bindless index in: the one its
+         *        usage allows, or, when it allows both, the one the bound pipeline reads. Records the
+         *        error and gives nullopt when neither settles it.
+         */
+        std::optional<BindlessKind> PushedKind(std::string_view name, const char* what,
+                                               bool canBeFirst, BindlessKind first, bool canBeSecond, BindlessKind second,
+                                               const char* askFirst, const char* askSecond, std::source_location where);
 
         /**
          * @brief Resolves @p name on the bound pipeline and writes @p data into the layout it declared.

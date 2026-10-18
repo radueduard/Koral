@@ -969,6 +969,8 @@ object KoralNative {
     fun koral_cmd_bind(commands: MemorySegment, name: String?, resource: MemorySegment, sampler: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_cmd_bind.invokeExact(commands, Native.cString(a, name), resource, sampler); Unit } }
     private val h_koral_cmd_push_index by lazy { handle("koral_cmd_push_index", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, KoralLayouts.KoralDescriptorIndex)) }
     fun koral_cmd_push_index(commands: MemorySegment, name: String?, index: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_cmd_push_index.invokeExact(commands, Native.cString(a, name), index); Unit } }
+    private val h_koral_cmd_push_resource by lazy { handle("koral_cmd_push_resource", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_cmd_push_resource(commands: MemorySegment, name: String?, resource: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_cmd_push_resource.invokeExact(commands, Native.cString(a, name), resource); Unit } }
     private val h_koral_cmd_uses_index by lazy { handle("koral_cmd_uses_index", FunctionDescriptor.ofVoid(ADDRESS, KoralLayouts.KoralDescriptorIndex)) }
     fun koral_cmd_uses_index(commands: MemorySegment, index: MemorySegment): Unit { h_koral_cmd_uses_index.invokeExact(commands, index) }
     private val h_koral_cmd_uses by lazy { handle("koral_cmd_uses", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT)) }

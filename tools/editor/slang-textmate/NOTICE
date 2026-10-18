@@ -1,0 +1,5 @@
+The Slang TextMate grammar and language configuration, unchanged, from the Slang Shading Language
+VS Code extension 2.0.10 (https://github.com/shader-slang/slang-vscode-extension), by The Khronos
+Group, Inc. — Copyright 2016 Carnegie Mellon University and NVIDIA Corporation, 2024 The Khronos Group, Inc.
+Licensed under Apache-2.0 WITH LLVM-exception (LICENSE.txt). package.json is Koral's: it names only what
+JetBrains' TextMate support reads (the language, its extensions, and the grammar).

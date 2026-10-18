@@ -16,7 +16,7 @@ private val dockCleaner: Cleaner = Cleaner.create()
  * whatever the others leave (the scene, where nothing is docked in it); down the left and down the right of the
  * space, each of which has levels, one over the other; and the two parts of the bottom, which runs under both.
  */
-enum class DockArea(val value: Int) { Left(0), Right(1), BottomLeft(2), BottomRight(3), Center(4) }
+enum class DockArea(val value: Int) { Left(0), Right(1), BottomLeft(2), BottomRight(3), Center(4), CenterRight(5) }
 
 /**
  * kui::DockLayout: how a dock space is arranged — which panels are in which area, which of them are open, how

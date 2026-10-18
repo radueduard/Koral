@@ -21,7 +21,8 @@
  * @endcode
  *
  * - **The view:** the wheel zooms about the pointer; the middle or right button drags it about; F frames what is
- *   picked (or everything).
+ *   picked (or everything). Given a NodeEditorView (NodeEditorOptions::SetView), where it looks is the caller's to
+ *   read and to move — and is kept a page at a time.
  * - **Picking:** a click picks a node, a wire or a comment, Shift or Control adds to what is picked, a drag over
  *   nothing picks what its rectangle touches; Control+A picks everything, Escape nothing.
  * - **Moving:** dragging a node moves everything picked; dragging a comment's title moves it and the nodes inside;
@@ -29,9 +30,13 @@
  * - **Wiring:** a drag from a port draws a wire, and letting go on a port it fits (by type, or canConnect) makes it.
  *   A drag from an input that has a wire picks the wire up. Let go on nothing, a wire is offered to onWireDropped.
  * - **Keys:** Delete removes what is picked; Control+C, +V and +D copy, paste at the pointer and duplicate.
+ * - **Pressed twice**, a node is told to onActivate. **The right button** let go where it was pressed opens the menu
+ *   NodeEditorOptions::menu gives, for the node under it (picked, with whatever else is) or for nothing.
  */
 
 #include <functional>
+#include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -48,12 +53,19 @@ namespace kui
         std::string type;                   ///< What it carries: ports of one type wire together, unless canConnect says more.
         Color color = colors::Inherit;      ///< Its dot's, and its wires'; the theme's accent when not set.
         bool multiple = false;              ///< An input that takes several wires; an output always may.
+        std::string value;                  ///< An input given a value where a wire could go: said, faint, beside its label.
+        /// An input's own control — a slider, a box to tick, a colour to pick — beside its label, in place of @ref value:
+        /// what it is set to on the node itself, while nothing is wired to it. Its row stays one row high.
+        Widget control;
     };
 
     /** @brief A node: a title, its ports, and its own controls under them. */
     struct GraphNode {
         std::string id;
         std::string title;
+        /// A Material icon's name (`"photo"`, `"functions"`), drawn in its title bar before the title: what kind of node
+        /// it is, at a glance. None when empty, or not an icon kui has.
+        std::string icon;
         kor::Vec2 position {};              ///< Its top-left, in the graph's coordinates.
         std::vector<NodePort> inputs;       ///< Down its left side.
         std::vector<NodePort> outputs;      ///< Down its right side.
@@ -83,6 +95,15 @@ namespace kui
         std::string text;
         Rect rect;                          ///< In the graph's coordinates.
         Color color = colors::Inherit;      ///< Faint behind the nodes; the theme's accent when not set.
+        /// Not empty: a frame round these nodes, wherever they are, in place of @ref rect. Dragged by its title it
+        /// moves them (onMove); it has no corner to resize it by, and is never told to onCommentChanged.
+        std::vector<std::string> around;
+        /// Drawn as a node that holds the nodes it is round — a solid title bar in its colour, a body, a border — rather
+        /// than a faint rectangle behind them: for nodes that are one thing, as a loop's are.
+        bool container = false;
+        /// How many frames round the same nodes it holds inside it: each further out than the one it holds. 0 for one
+        /// that holds none.
+        int depth = 0;
     };
 
     /** @brief What the editor shows. */
@@ -90,6 +111,48 @@ namespace kui
         std::vector<GraphNode> nodes;
         std::vector<GraphWire> wires;
         std::vector<GraphComment> comments;
+    };
+
+    /**
+     * @brief Where a node editor looks, shared with whoever made it: to read where a node is on the screen, to put a
+     *        node made in the middle of what is seen, to frame the graph or bring a node into view.
+     *
+     * Kept a page at a time: whoever builds the editor says which @ref page it shows, and each page is looked at
+     * where it was left — one shown for the first time, framed whole (once it has a node). What the editor is given to
+ * show is that page.
+     *
+     * @code
+     * auto view = std::make_shared<kui::NodeEditorView>();     // kept, as the graph is
+     * view->page = "lighting";
+     * kui::NodeEditor(graph, kui::NodeEditorOptions{}.SetView(view));
+     * view->Reveal("blur");                                     // picked, and in sight, from the next layout
+     * @endcode
+     */
+    struct KUI_API NodeEditorView {
+        std::string page;                   ///< Which page the editor shows: set before it is built.
+        kor::Vec2 centre {};                ///< The point of the graph in the middle of the editor.
+        float zoom = 1.f;                   ///< Units of the view to one of the graph's.
+        kor::Vec2 size {};                  ///< How big the editor is, as last laid out.
+        kor::Vec2 origin {};                ///< Where its top-left is, in the view's coordinates, as last painted.
+
+        /** @brief Where a point of the graph is, in the view's coordinates. */
+        [[nodiscard]] kor::Vec2 ToView(kor::Vec2 graph) const { return origin + size * 0.5f + (graph - centre) * zoom; }
+        /** @brief Where a point of the view is, in the graph's. */
+        [[nodiscard]] kor::Vec2 ToGraph(kor::Vec2 view) const { return centre + (view - origin - size * 0.5f) / (zoom > 0.f ? zoom : 1.f); }
+        /** @brief Frames the whole page, from the next layout — or, while nothing is on it, once something is. */
+        void Frame();
+        /** @brief Picks node @p id and brings it into view, from the next layout: what goes to a node. */
+        void Reveal(std::string id);
+
+        /// The editor's own: where each page was left, and what is asked of it before it is next laid out.
+        struct Kept {
+            std::optional<std::string> showing;     ///< The page centre and zoom are of.
+            std::map<std::string, std::pair<kor::Vec2, float>> pages;
+            bool frame = false;
+            std::string reveal;
+            const void* editor = nullptr;   ///< The editor showing it, and how to have it laid out again.
+            std::function<void()> wake;
+        } kept;
     };
 
     /** @brief What the editor tells of what the user did. Each change is the caller's to make. */
@@ -119,6 +182,16 @@ namespace kui
         std::function<void(const std::vector<std::string>& nodes)> onSelectionChanged;
         /** @brief A comment moved or resized: its new rectangle. Nodes it carried are told through onMove. */
         std::function<void(const std::string& comment, Rect rect)> onCommentChanged;
+        /** @brief A node pressed twice. */
+        std::function<void(const std::string& node)> onActivate;
+        /**
+         * @brief The menu the right button opens, let go where it was pressed: for @p nodes (what is picked, once the
+         *        node under the pointer is) or, over nothing, for no nodes; @p at in the graph. An empty menu is none —
+         *        and over nothing, onContextMenu is told instead.
+         */
+        std::function<std::vector<MenuItem>(const std::vector<std::string>& nodes, kor::Vec2 at)> menu;
+        /** @brief Where it looks, when the caller would know or say: see NodeEditorView. Null: its own, kept by itself. */
+        std::shared_ptr<NodeEditorView> view;
         float gridSize = 20.f;              ///< Between the grid's lines, in graph units; 0 draws none.
 
         // Chainable: `kui::NodeEditorOptions{}.On...(...).On...(...)`.
@@ -138,6 +211,9 @@ namespace kui
         NodeEditorOptions& OnWireDropped(std::function<void(const PortRef&, bool, kor::Vec2)> f) { onWireDropped = std::move(f); return *this; }
         NodeEditorOptions& OnSelectionChanged(std::function<void(const std::vector<std::string>&)> f) { onSelectionChanged = std::move(f); return *this; }
         NodeEditorOptions& OnCommentChanged(std::function<void(const std::string&, Rect)> f) { onCommentChanged = std::move(f); return *this; }
+        NodeEditorOptions& OnActivate(std::function<void(const std::string&)> f) { onActivate = std::move(f); return *this; }
+        NodeEditorOptions& Menu(std::function<std::vector<MenuItem>(const std::vector<std::string>&, kor::Vec2)> f) { menu = std::move(f); return *this; }
+        NodeEditorOptions& SetView(std::shared_ptr<NodeEditorView> value) { view = std::move(value); return *this; }
         NodeEditorOptions& SetGridSize(const float value) { gridSize = value; return *this; }
     };
 
@@ -147,13 +223,14 @@ namespace kui
     /** @brief How a node's card is laid out: where its ports are, for whoever draws or tests against it. */
     namespace nodes {
         inline constexpr float TitleHeight = 28.f;
-        inline constexpr float RowHeight = 24.f;
+        inline constexpr float PortsTop = 6.f;      ///< Between the title and the first row of ports.
+        inline constexpr float RowHeight = 30.f;    ///< A row of ports: room for a control with some air round it.
         inline constexpr float MinWidth = 140.f;
         inline constexpr float PortRadius = 5.f;
         /** @brief Where a node's @p index th port is, from its top-left: on its left edge for an input, its right for an output. */
         inline kor::Vec2 PortOffset(const bool output, const std::size_t index, const float nodeWidth)
         {
-            return { output ? nodeWidth : 0.f, TitleHeight + (static_cast<float>(index) + 0.5f) * RowHeight };
+            return { output ? nodeWidth : 0.f, TitleHeight + PortsTop + (static_cast<float>(index) + 0.5f) * RowHeight };
         }
     }
 }

@@ -198,6 +198,31 @@ does that working; because it is last, it can never shadow a project's own direc
 
 An **absolute** path handed to a loader is never resolved; it is opened exactly as given.
 
+### Shaders in an editor
+
+An editor's own shader checker does not know these roots, so every `#include <koralUI.glsl>` and
+`import koral_bindless;` would be an error there. The SDK ships two language servers that do, in
+`bin/`:
+
+- `slangd` — Slang's own, from the same Slang the runtime compiles with.
+- `koral-glsld` — GLSL, on the runtime's glslang and settings (Vulkan 1.3, SPIR-V 1.6, `#include`
+  enabled, the stage from the file name). It finds a file's roots itself: the nearest koral.json's
+  `shaderDirectories`, that project's `.koral/shaders/*`, then the SDK's shaders and any `-I <dir>`.
+  A header (no stage in its name) is checked through a shader that includes it.
+
+Koral Hub wires them up for a project of any language, on every build and IDE open:
+
+- `.koral/shaders/` links to the SDK's and module projects' shader directories, and `.koral/bin` to
+  the SDK's `bin/`.
+- VS Code: `slang.additionalSearchPaths` for the Slang extension.
+- JetBrains IDEs with LSP4IJ (CLion, IntelliJ, Rider): both servers registered as LSP4IJ language
+  servers, run as `$PROJECT_DIR$/.koral/bin/<server>`. No Slang plugin is needed. slangd is given
+  `$PROJECT_DIR$/shaders` and the SDK's shaders as its search paths. The registration is per IDE
+  rather than per project, which is why `koral-glsld` finds the roots itself.
+- The same IDEs get the Slang grammar the SDK ships (`share/Koral/editor/slang-textmate`, from the
+  Slang VS Code extension, Apache-2.0 WITH LLVM-exception) as a TextMate bundle, from the Hub's own
+  copy of it, for syntax colouring.
+
 If a listed directory does not exist, the runtime warns at startup and carries on. That is almost
 always a typo, and it is far easier to see it named in a warning than to work out later why a texture
 never loaded.

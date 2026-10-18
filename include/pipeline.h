@@ -210,11 +210,15 @@ namespace kor
             kor::u32 arrayStride = 0;   ///< Bytes between array elements, as the shader spaced them.
             kor::u32 matrixStride = 0;  ///< Bytes between matrix columns, likewise.
             bool aggregate = false;     ///< A struct or an array of structs: writable only as raw bytes.
+            kor::u8 handle = 0;         ///< A Slang `T.Handle`: the kor::BindlessKind it indexes, as a byte; 0 otherwise.
+            bool parameter = false;     ///< An entry point's `uniform` parameter: its fields are found by their own names too.
         };
 
         /**
          * @brief Looks a push constant up by the name its shader gave it.
-         * @return The constant, or nullptr when no stage of this pipeline declares one so named.
+         * @return The constant, or nullptr when no stage of this pipeline declares one so named. A field of an
+         *         entry point's `uniform` parameter (Slang) is also found by its own name ("color" for
+         *         "push.color"), when only one parameter has it; a nested struct's fields are not.
          *
          * What CommandBuffer::PushConstant uses instead of making the caller work out byte
          * offsets. Names are merged across stages: a constant declared by both the vertex and

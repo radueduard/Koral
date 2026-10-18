@@ -61,7 +61,7 @@ namespace kui
             std::size_t active = 0;
             Node* parent = nullptr;
             bool tool = false;                  ///< A leaf that is an area round the edge: it can be hidden.
-            bool center = false;                ///< The leaf that is the middle: its tabs are all of its panels.
+            bool center = false;                ///< A leaf that is the middle, or a part of it: its tabs are all of its panels.
             /// The middle while nothing is docked in it: a leaf with no panels, which shows what is
             /// behind the space and lets the pointer through.
             bool hole = false;
@@ -88,7 +88,8 @@ namespace kui
         struct Group {
             std::vector<std::string> panels;    ///< In the order of their buttons.
             std::string shown;                  ///< The one that is open; none: the area is folded away.
-            float weight = 1.f;                 ///< A side's part: its share of the side's height.
+            float weight = 1.f;                 ///< A side's part: its share of the side's height; the middle's, of its width.
+            int slot = 0;                       ///< A part of the middle: the part it was made as, what Dock(panel, eCenter, part) finds it by.
         };
 
         std::unique_ptr<Node> TabsOf(std::string panel)
@@ -103,9 +104,9 @@ namespace kui
 
     struct DockLayout::Impl {
         // Where each docked panel is. Down a side there may be several parts, one over the other; the
-        // bottom has two, side by side; the middle one.
-        std::vector<Group> left, right;
-        Group bottomLeft, bottomRight, center;
+        // bottom has two, side by side; the middle as many as there are, side by side, from the left.
+        std::vector<Group> left, right, middle;
+        Group bottomLeft, bottomRight;
         /// How wide the sides are and how tall the bottom is, in the space's units — or, negative, that
         /// share of the space, until the first layout says how big the space is.
         float leftWidth = -0.22f, rightWidth = -0.22f, bottomHeight = -0.3f;
@@ -133,6 +134,8 @@ namespace kui
         std::map<std::string, kor::Vec2> floatAt;
         /// Where each panel was last docked: where the button that docks a float back puts it.
         std::map<std::string, DockArea> lastArea;
+        /// Panels Activated before they were placed: in front of whatever is placed in their group after them.
+        std::set<std::string> raised;
         std::function<void()> changed;          ///< The dock space showing it.
 
         void Changed() const { if (changed) changed(); }
@@ -145,7 +148,7 @@ namespace kui
             for (std::size_t i = 0; i < right.size(); ++i) visit(right[i], DockArea::eRight, static_cast<int>(i));
             visit(bottomLeft, DockArea::eBottomLeft, 0);
             visit(bottomRight, DockArea::eBottomRight, 0);
-            visit(center, DockArea::eCenter, 0);
+            for (std::size_t i = 0; i < middle.size(); ++i) visit(middle[i], DockArea::eCenter, static_cast<int>(i));
         }
 
         /** The group @p panel is docked in, with which area it is; null when it floats, or is nowhere. */
@@ -169,10 +172,8 @@ namespace kui
 
         bool Known(const std::string& panel) { return GroupOf(panel) != nullptr || FloatOf(panel) != nullptr; }
 
-        Group& GroupAt(const DockArea area)
-        {
-            return area == DockArea::eBottomLeft ? bottomLeft : area == DockArea::eBottomRight ? bottomRight : center;
-        }
+        Group& GroupAt(const DockArea area) { return area == DockArea::eBottomLeft ? bottomLeft : bottomRight; }
+        static bool Middle(const DockArea area) { return area == DockArea::eCenter || area == DockArea::eCenterRight; }
 
         static Node* FindIn(Node* node, const std::string& panel)
         {
@@ -187,15 +188,17 @@ namespace kui
         /** Takes @p panel out of wherever it is. */
         void Remove(const std::string& panel)
         {
+            raised.erase(panel);
             EachGroup([&](Group& group, const DockArea area, int) {
                 if (std::erase(group.panels, panel) == 0) return;
                 lastArea[panel] = area;
                 // The middle always shows one of its panels; an area round the edge whose open panel went is folded away.
-                if (group.shown == panel) group.shown = area == DockArea::eCenter && !group.panels.empty() ? group.panels.front() : std::string();
+                if (group.shown == panel) group.shown = Middle(area) && !group.panels.empty() ? group.panels.front() : std::string();
             });
-            // A part of a side with nothing left in it is no part.
+            // A part of a side, or of the middle, with nothing left in it is no part: the others have its room.
             std::erase_if(left, [](const Group& g) { return g.panels.empty(); });
             std::erase_if(right, [](const Group& g) { return g.panels.empty(); });
+            std::erase_if(middle, [](const Group& g) { return g.panels.empty(); });
             if (const Floating* f = FloatOf(panel)) {
                 // Its size is kept for when it floats again.
                 floatSize[panel] = f->rect.Size();
@@ -210,6 +213,8 @@ namespace kui
          * Docks @p panel (which is nowhere) in @p area, and opens it. Among the area's buttons it goes
          * before @p before, or after @p after, or last. Down a side those also say which part: theirs
          * — or, with @p newPart, a part of its own, under the one @p after is in (the first, with none).
+         * In the middle the same, across: a part of its own right of the one @p after is in, left of the
+         * one @p before is in, or right of them all (eCenterRight says that too).
          */
         void DockAt(const std::string& panel, const DockArea area, const std::string& before = {}, const std::string& after = {},
                     const bool newPart = false, const float share = 0.f)
@@ -219,35 +224,70 @@ namespace kui
                 if (!before.empty()) at = std::ranges::find(group.panels, before);
                 else if (!after.empty()) { at = std::ranges::find(group.panels, after); if (at != group.panels.end()) ++at; }
                 group.panels.insert(at, panel);
-                group.shown = panel;
+                // A closed panel is placed, and not shown in place of what is open there.
+                if (!closed.contains(panel) || group.shown.empty() || closed.contains(group.shown)) group.shown = panel;
+            };
+            const auto partOf = [](const std::vector<Group>& parts, const std::string& other) {
+                for (std::size_t i = 0; i < parts.size(); ++i) if (Holds(parts[i], other)) return static_cast<int>(i);
+                return -1;
             };
             if (area == DockArea::eLeft || area == DockArea::eRight) {
                 auto& parts = area == DockArea::eLeft ? left : right;
                 const bool first = parts.empty();
-                const auto partOf = [&](const std::string& other) {
-                    for (std::size_t i = 0; i < parts.size(); ++i) if (Holds(parts[i], other)) return static_cast<int>(i);
-                    return -1;
-                };
                 if (newPart || parts.empty()) {
-                    const int at = parts.empty() || after.empty() ? 0 : partOf(after) + 1;
+                    const int at = parts.empty() || after.empty() ? 0 : partOf(parts, after) + 1;
                     insert(*parts.insert(parts.begin() + at, Group {}));
                 } else {
-                    const int at = !before.empty() ? partOf(before) : !after.empty() ? partOf(after) : 0;
+                    const int at = !before.empty() ? partOf(parts, before) : !after.empty() ? partOf(parts, after) : 0;
                     insert(parts[static_cast<std::size_t>(std::max(at, 0))]);
                 }
                 if (first && share > 0.f) (area == DockArea::eLeft ? leftWidth : rightWidth) = -share;
+            } else if (Middle(area)) {
+                const auto end = static_cast<int>(middle.size());
+                if (newPart || middle.empty() || area == DockArea::eCenterRight) {
+                    int at = end;
+                    if (newPart && !before.empty()) at = std::max(partOf(middle, before), 0);
+                    else if (newPart && !after.empty()) at = partOf(middle, after) + 1;
+                    at = std::clamp(at, 0, end);
+                    insert(*middle.insert(middle.begin() + at, Group {}));
+                    // Put there by hand, the parts are what they are now: a later Dock(…, eCenter, part) counts them from the left.
+                    for (std::size_t i = 0; i < middle.size(); ++i) middle[i].slot = static_cast<int>(i);
+                } else {
+                    const int at = !before.empty() ? partOf(middle, before) : !after.empty() ? partOf(middle, after) : 0;
+                    insert(middle[static_cast<std::size_t>(std::max(at, 0))]);
+                }
             } else {
                 const bool first = bottomLeft.panels.empty() && bottomRight.panels.empty();
                 insert(GroupAt(area));
-                if (area != DockArea::eCenter && first && share > 0.f) bottomHeight = -share;
+                if (first && share > 0.f) bottomHeight = -share;
             }
             lastArea[panel] = area;
             dirty = true;
         }
 
-        /** Docks @p panel in the @p part 'th part of @p area (a side's; the others have the one), last among its buttons. */
-        void DockInPart(const std::string& panel, const DockArea area, const int part, const float share = 0.f)
+        /**
+         * Docks @p panel in the @p part 'th part of @p area (a side's, or the middle's; the bottom's ends have the one),
+         * last among its buttons. In the middle, the part made as that one: one that is not there is made, among the
+         * others in the order of the parts they were made as. eCenterRight is a part of its own, right of them all.
+         */
+        void DockInPart(const std::string& panel, DockArea area, int part, const float share = 0.f)
         {
+            if (area == DockArea::eCenterRight) { area = DockArea::eCenter; part = std::numeric_limits<int>::max() / 2; }
+            if (area == DockArea::eCenter) {
+                const auto same = std::ranges::find_if(middle, [part](const Group& g) { return g.slot == part; });
+                Group* into = same != middle.end() ? &*same : nullptr;
+                if (!into) {
+                    const auto after = std::ranges::find_if(middle, [part](const Group& g) { return g.slot > part; });
+                    Group made;
+                    made.slot = part;
+                    into = &*middle.insert(after, std::move(made));
+                }
+                into->panels.push_back(panel);
+                if (!closed.contains(panel) || into->shown.empty() || closed.contains(into->shown)) into->shown = panel;
+                lastArea[panel] = area;
+                dirty = true;
+                return;
+            }
             if (area != DockArea::eLeft && area != DockArea::eRight) { DockAt(panel, area, {}, {}, false, share); return; }
             auto& parts = area == DockArea::eLeft ? left : right;
             const bool first = parts.empty();
@@ -281,14 +321,25 @@ namespace kui
             const Default& d = it->second;
             if (d.floating) { FloatPanel(panel, *d.floating, false); return; }
             DockArea beside = DockArea::eCenter;
-            if (!d.beside.empty() && GroupOf(d.beside, &beside) && beside == d.area) DockAt(panel, d.area, {}, d.beside, false, d.share);
+            if (!d.beside.empty() && GroupOf(d.beside, &beside) && (beside == d.area || (Middle(beside) && Middle(d.area))))
+                DockAt(panel, beside, {}, d.beside, false, d.share);
             else DockInPart(panel, d.area, d.part, d.share);
+            // One of its group that was Activated before anything was placed stays in front of it.
+            if (Group* group = GroupOf(panel))
+                for (const auto& other : group->panels)
+                    if (other != panel && raised.contains(other) && !closed.contains(other)) { group->shown = other; break; }
         }
 
         /** Opens @p panel in its area, in front of whatever was open there. */
         void Show(const std::string& panel)
         {
-            if (Group* group = GroupOf(panel); group && group->shown != panel) { group->shown = panel; dirty = true; }
+            // Made again even when it is the one its group says is shown: one that was closed, and is opened again,
+            // still is — while another of its tabs stood in for it.
+            if (Group* group = GroupOf(panel)) {
+                group->shown = panel;
+                for (const auto& other : group->panels) raised.erase(other);     // shown since, by whoever said so
+                dirty = true;
+            }
         }
 
         // ---- the tree the open panels are laid out by ---------------------------------------------------
@@ -304,20 +355,34 @@ namespace kui
             return node;
         }
 
-        /** A side's open parts, one over the other, each with its share of the side's height. */
-        std::unique_ptr<Node> Column(std::vector<Group>& parts)
+        /** A part of the middle: all of its panels, tabs, the one it shows in front. */
+        static std::unique_ptr<Node> MiddleOf(const Group& group)
+        {
+            auto leaf = std::make_unique<Node>();
+            leaf->center = true;
+            leaf->tabs = group.panels;
+            const auto at = std::ranges::find(group.panels, group.shown);
+            leaf->active = at != group.panels.end() ? static_cast<std::size_t>(at - group.panels.begin()) : 0;
+            return leaf;
+        }
+
+        /**
+         * A side's open parts, one over the other, each with its share of the side's height — or, @p across, the
+         * middle's parts side by side, each with its share of its width.
+         */
+        std::unique_ptr<Node> Column(std::vector<Group>& parts, const bool across = false)
         {
             std::vector<std::size_t> open;
-            for (std::size_t i = 0; i < parts.size(); ++i) if (!parts[i].shown.empty()) open.push_back(i);
+            for (std::size_t i = 0; i < parts.size(); ++i) if (across ? !parts[i].panels.empty() : !parts[i].shown.empty()) open.push_back(i);
             std::unique_ptr<Node> rest;
             for (std::size_t k = open.size(); k-- > 0;) {
-                auto leaf = TabsOf(parts[open[k]].shown);
-                leaf->tool = true;
+                auto leaf = across ? MiddleOf(parts[open[k]]) : TabsOf(parts[open[k]].shown);
+                leaf->tool = !across;
                 if (!rest) { rest = std::move(leaf); continue; }
                 float under = 0.f;
                 for (std::size_t j = k + 1; j < open.size(); ++j) under += parts[open[j]].weight;
                 const float own = parts[open[k]].weight;
-                auto split = Join(Axis::eVertical, std::move(leaf), std::move(rest));
+                auto split = Join(across ? Axis::eHorizontal : Axis::eVertical, std::move(leaf), std::move(rest));
                 split->ratio = own + under > 0.f ? own / (own + under) : 0.5f;
                 // Dragged: this part's share of itself and what is under it, which keep theirs of each other.
                 split->onResize = [&parts, open, k](const float ratio) {
@@ -347,14 +412,10 @@ namespace kui
                 leaf->tool = true;
                 return leaf;
             };
-            std::unique_ptr<Node> top = std::make_unique<Node>();
-            if (center.panels.empty()) {
+            std::unique_ptr<Node> top = Column(middle, true);
+            if (!top) {
+                top = std::make_unique<Node>();
                 top->hole = true;
-            } else {
-                top->center = true;
-                top->tabs = center.panels;
-                const auto at = std::ranges::find(center.panels, center.shown);
-                top->active = at != center.panels.end() ? static_cast<std::size_t>(at - center.panels.begin()) : 0;
             }
             const auto fixed = [](std::unique_ptr<Node> split, float& extent, const bool second) {
                 split->extent = extent >= 0.f ? extent : 200.f;
@@ -538,12 +599,23 @@ namespace kui
         return *this;
     }
 
-    void DockLayout::Close(const std::string& panel) { if (_impl->closed.insert(panel).second) _impl->Changed(); }
+    void DockLayout::Close(const std::string& panel)
+    {
+        if (!_impl->closed.insert(panel).second) return;
+        // The middle shows one of its panels: another that is open, when this one was the one it showed.
+        DockArea area = DockArea::eLeft;
+        if (Group* group = _impl->GroupOf(panel, &area); group && group->shown == panel && Impl::Middle(area))
+            for (const auto& other : group->panels)
+                if (!_impl->closed.contains(other)) { group->shown = other; _impl->dirty = true; break; }
+        _impl->Changed();
+    }
     void DockLayout::Open(const std::string& panel) { if (_impl->closed.erase(panel) > 0) { Activate(panel); _impl->Changed(); } }
     bool DockLayout::IsOpen(const std::string& panel) const { return !_impl->closed.contains(panel); }
 
     void DockLayout::Activate(const std::string& panel)
     {
+        // Not placed yet: it is when the dock space first shows it, in front of those of its group placed after it.
+        if (!_impl->Known(panel)) _impl->raised.insert(panel);
         _impl->Show(panel);
         _impl->Changed();
     }
@@ -553,7 +625,7 @@ namespace kui
         DockArea area = DockArea::eCenter;
         Group* group = _impl->GroupOf(panel, &area);
         // The middle always shows one of its panels: there is nothing to fold it away to.
-        if (!group || area == DockArea::eCenter || group->shown != panel) return;
+        if (!group || Impl::Middle(area) || group->shown != panel) return;
         group->shown.clear();
         _impl->dirty = true;
         _impl->Changed();
@@ -578,7 +650,7 @@ namespace kui
         for (const auto& group : _impl->right) Impl::Write(out, "right", group);
         Impl::Write(out, "bottom-left", _impl->bottomLeft);
         Impl::Write(out, "bottom-right", _impl->bottomRight);
-        Impl::Write(out, "center", _impl->center);
+        for (const auto& group : _impl->middle) Impl::Write(out, "center", group);
         for (const auto& f : _impl->floats) {
             if (!f.root || f.root->tabs.empty()) continue;
             // No size is one as big as what it shows.
@@ -604,9 +676,10 @@ namespace kui
     {
         Impl::Reader reader { text };
         if (reader.Word() != "dock" || reader.Number() != 2.f) return false;
-        std::vector<Group> left, right;
-        Group bottomLeft, bottomRight, center;
+        std::vector<Group> left, right, middle;
+        Group bottomLeft, bottomRight;
         float leftWidth = _impl->leftWidth, rightWidth = _impl->rightWidth, bottomHeight = _impl->bottomHeight, bottomSplit = _impl->bottomSplit;
+        std::optional<float> middleSplit;     // what a layout from when the middle was in two parts at most said of them
         std::vector<Floating> floats;
         std::set<std::string> closed;
         std::map<std::string, kor::Vec2> floatSize;
@@ -619,6 +692,8 @@ namespace kui
                 rightWidth = reader.Number();
                 bottomHeight = reader.Number();
                 bottomSplit = std::clamp(reader.Number(), 0.05f, 0.95f);
+            } else if (word == "middle") {
+                middleSplit = std::clamp(reader.Number(), 0.05f, 0.95f);
             } else if (word == "group") {
                 const std::string where = reader.Word();
                 Group group;
@@ -633,7 +708,11 @@ namespace kui
                 else if (where == "right") right.push_back(std::move(group));
                 else if (where == "bottom-left") bottomLeft = std::move(group);
                 else if (where == "bottom-right") bottomRight = std::move(group);
-                else if (where == "center") { if (group.shown.empty()) group.shown = group.panels.front(); center = std::move(group); }
+                else if (where == "center" || where == "center-right") {     // (center-right: a layout from when there were two at most)
+                    if (group.shown.empty()) group.shown = group.panels.front();
+                    group.slot = static_cast<int>(middle.size());
+                    middle.push_back(std::move(group));
+                }
                 else reader.ok = false;
             } else if (word == "float") {
                 Floating f;
@@ -662,7 +741,8 @@ namespace kui
         _impl->right = std::move(right);
         _impl->bottomLeft = std::move(bottomLeft);
         _impl->bottomRight = std::move(bottomRight);
-        _impl->center = std::move(center);
+        if (middleSplit && middle.size() == 2) { middle[0].weight = *middleSplit; middle[1].weight = 1.f - *middleSplit; }
+        _impl->middle = std::move(middle);
         _impl->leftWidth = leftWidth;
         _impl->rightWidth = rightWidth;
         _impl->bottomHeight = bottomHeight;
@@ -1859,26 +1939,51 @@ namespace kui
             }
 
             // The middle: what the sides and the bottom leave, whether panels are docked in it or it is
-            // empty. On its title bar, or within the Middle about its centre, the panel joins it — a tab
-            // among whatever is there. (The rest of it is no target, so that a panel can be let go over
-            // the middle to float there.)
+            // empty. On a part's title bar, or within the Middle about its centre, the panel joins that part —
+            // a tab among whatever is there. Over a part's left or right edge it is a part of its own, on that
+            // side of it: the middle is in as many parts, side by side, as are made so. (The rest of it is no
+            // target, so that a panel can be let go over the middle to float there.)
             {
                 const float Middle = S().centerDropSize;
-                const std::function<const Node*(const Node*)> find = [&find](const Node* node) -> const Node* {
-                    if (!node) return nullptr;
-                    if (!node->split) return node->hole || node->center ? node : nullptr;
-                    if (const Node* found = find(node->a.get())) return found;
-                    return find(node->b.get());
+                std::vector<const Node*> parts;
+                const std::function<void(const Node*)> find = [&](const Node* node) {
+                    if (!node) return;
+                    if (!node->split) { if (node->hole || node->center) parts.push_back(node); return; }
+                    find(node->a.get());
+                    find(node->b.get());
                 };
-                const Node* middle = find(layout.root.get());
-                const Rect where = middle ? middle->rect : layout.root ? Rect {} : _docked;
-                const bool own = Holds(layout.center, panel) && layout.center.panels.size() == 1;
-                if (!where.Empty() && where.Contains(position) && !own) {
+                find(layout.root.get());
+                // A part that holds only the panel in hand is leaving: it is no target.
+                const auto leaving = [&](const Node* part) { return part && part->center && part->tabs.size() == 1 && part->tabs.front() == panel; };
+                // What stands for a part among the middle's: one of its panels that is not the one in hand.
+                const auto member = [&](const Node* part) -> std::string {
+                    for (const auto& tab : part->tabs) if (tab != panel) return tab;
+                    return {};
+                };
+                if (parts.empty() && !layout.root) parts.push_back(nullptr);    // nothing open at all: the middle is the whole space
+                for (const Node* part : parts) {
+                    const Rect where = part ? part->rect : _docked;
+                    if (where.Empty() || !where.Contains(position)) continue;
+                    if (part && part->center && !leaving(part)) {
+                        const float edge = where.Width() * Middle * 0.5f;
+                        const bool onLeft = position.x <= where.left + edge, onRight = position.x >= where.right - edge;
+                        if ((onLeft || onRight) && !part->bar.Contains(position)) {
+                            zone.valid = true;
+                            zone.area = DockArea::eCenter;
+                            zone.newPart = true;
+                            (onLeft ? zone.before : zone.after) = member(part);
+                            const float half = where.left + where.Width() * 0.5f;
+                            zone.preview = onLeft ? Rect::LTRB(where.left, where.top, half, where.bottom) : Rect::LTRB(half, where.top, where.right, where.bottom);
+                            return zone;
+                        }
+                    }
+                    if (leaving(part)) continue;
                     const kor::Vec2 at = (position - where.TopLeft()) / kor::Max(where.Size(), kor::Vec2(1.f));
-                    const bool onBar = middle && middle->center && middle->bar.Contains(position);
+                    const bool onBar = part && part->center && part->bar.Contains(position);
                     if (onBar || (std::abs(at.x - 0.5f) <= Middle * 0.5f && std::abs(at.y - 0.5f) <= Middle * 0.5f)) {
                         zone.valid = true;
                         zone.area = DockArea::eCenter;
+                        if (part && part->center) zone.after = part->tabs.back() == panel ? member(part) : part->tabs.back();
                         zone.preview = where;
                         return zone;
                     }

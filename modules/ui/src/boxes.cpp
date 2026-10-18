@@ -734,8 +734,9 @@ namespace kui
             const float view = vertical ? Size().y : Size().x;
             const float length = std::max(view * view / (view + max), 16.f);
             Canvas thumb;
-            const Rect r = vertical ? Rect::XYWH(Size().x - 5.f, 0.f, 3.f, length) : Rect::XYWH(0.f, Size().y - 5.f, length, 3.f);
-            thumb.DrawRRect({ r, 1.5f }, Paint::Fill(Theme::Current().textMuted.WithAlpha(0.6f)));
+            // Wide enough to take hold of: its strip, the gutter, is what is pressed.
+            const Rect r = vertical ? Rect::XYWH(Size().x - 6.5f, 0.f, 5.f, length) : Rect::XYWH(0.f, Size().y - 6.5f, length, 5.f);
+            thumb.DrawRRect({ r, 2.5f }, Paint::Fill(Theme::Current().textMuted.WithAlpha(0.6f)));
             if (!_thumb) _thumb = Layer::Create();
             _thumb->SetPicture(thumb.Finish());
             canvas.Save();
@@ -748,6 +749,32 @@ namespace kui
 
     bool RenderScroll::HandleEvent(const PointerEvent& event)
     {
+        // The thumb, held and moved; or the strip it runs along, pressed: the thumb goes there, and is held.
+        const bool vertical = _axis == Axis::eVertical;
+        const float along = vertical ? event.local.y : event.local.x, across = vertical ? event.local.x : event.local.y;
+        const float view = vertical ? Size().y : Size().x, breadth = vertical ? Size().x : Size().y;
+        const float max = MaxScroll();
+        const float length = max > 0.f ? std::max(view * view / (view + max), 16.f) : view, travel = std::max(view - length, 1.f);
+        switch (event.type) {
+        case PointerEvent::Type::eDown: {
+            if (event.button != kor::MouseButton::eLeft || event.taken || max <= 0.f || across < breadth - 10.f) break;
+            const float at = travel * (_scroll / max);
+            _grabAt = along >= at && along <= at + length ? along - at : length * 0.5f;
+            _dragging = true;
+            Scroll(std::clamp(along - _grabAt, 0.f, travel) / travel * max - _scroll);
+            return true;
+        }
+        case PointerEvent::Type::eMove:
+            if (!_dragging) break;
+            Scroll(std::clamp(along - _grabAt, 0.f, travel) / travel * max - _scroll);
+            return true;
+        case PointerEvent::Type::eUp:
+        case PointerEvent::Type::eCancel:
+            if (!_dragging) break;
+            _dragging = false;
+            return true;
+        default: break;
+        }
         if (event.type != PointerEvent::Type::eScroll) return false;
         const float step = 48.f;
         const float amount = _axis == Axis::eVertical ? -event.delta.y : -(event.delta.x != 0.f ? event.delta.x : event.delta.y);

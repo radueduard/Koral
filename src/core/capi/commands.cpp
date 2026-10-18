@@ -347,6 +347,21 @@ void koral_cmd_push_index(KoralCommandBuffer* c, const char* name, const KoralDe
         x.PushConstant(name ? name : "", DescriptorIndex{ index.index, static_cast<BindlessKind>(index.kind) });
     });
 }
+void koral_cmd_push_resource(KoralCommandBuffer* c, const char* name, KoralResource* resource)
+{
+    Record(c, [&](CommandBuffer& x) {
+        if (!resource) throw std::runtime_error("no resource to push");
+        const std::string_view n = name ? name : "";
+        switch (resource->Kind()) {
+        case KORAL_RESOURCE_IMAGE: x.PushConstant(n, RefOf<Image>(resource)); break;
+        case KORAL_RESOURCE_IMAGE_VIEW: x.PushConstant(n, RefOf<ImageView>(resource)); break;
+        case KORAL_RESOURCE_BUFFER: x.PushConstant(n, RefOf<Buffer>(resource)); break;
+        case KORAL_RESOURCE_SAMPLER: x.PushConstant(n, RefOf<Sampler>(resource)); break;
+        case KORAL_RESOURCE_ACCELERATION_STRUCTURE: x.PushConstant(n, RefOf<AccelerationStructure>(resource)); break;
+        default: throw std::runtime_error(std::string("a ") + KindName(resource->Kind()) + " has no bindless index to push");
+        }
+    });
+}
 void koral_cmd_uses_index(KoralCommandBuffer* c, const KoralDescriptorIndex index)
 {
     Record(c, [&](CommandBuffer& x) { x.Uses(DescriptorIndex{ index.index, static_cast<BindlessKind>(index.kind) }); });

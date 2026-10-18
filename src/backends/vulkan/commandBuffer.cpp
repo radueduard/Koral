@@ -5,6 +5,7 @@
 #include "commandBuffer.h"
 #include "surface.h"
 #include "../../core/current.h"
+#include <algorithm>
 #include <window.h>
 
 #include <ranges>
@@ -1079,8 +1080,12 @@ namespace kor::vk
             return RecordError(ErrorCode::eImageSubresourceOutOfRange,
                 std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.ArrayLayers()));
 
-        if (copyInfo.imageExtent == kor::IVec3(-1))
-            copyInfo.imageExtent = kor::IVec3(image->Extent());
+        // The whole of the level copied: a level past the first is smaller, by half each way a level.
+        if (copyInfo.imageExtent == kor::IVec3(-1)) {
+            const auto full = image->Extent();
+            const auto level = [&](const kor::u32 size) { return static_cast<int>(std::max<kor::u32>(size >> copyInfo.imageMipLevel, 1u)); };
+            copyInfo.imageExtent = kor::IVec3(level(full.x), level(full.y), level(full.z));
+        }
 
         if (copyInfo.bufferRowLength == 0)
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;
@@ -1165,8 +1170,12 @@ namespace kor::vk
             return RecordError(ErrorCode::eImageSubresourceOutOfRange,
                 std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.ArrayLayers()));
 
-        if (copyInfo.imageExtent == kor::IVec3(-1))
-            copyInfo.imageExtent = kor::IVec3(image->Extent());
+        // The whole of the level copied: a level past the first is smaller, by half each way a level.
+        if (copyInfo.imageExtent == kor::IVec3(-1)) {
+            const auto full = image->Extent();
+            const auto level = [&](const kor::u32 size) { return static_cast<int>(std::max<kor::u32>(size >> copyInfo.imageMipLevel, 1u)); };
+            copyInfo.imageExtent = kor::IVec3(level(full.x), level(full.y), level(full.z));
+        }
 
         if (copyInfo.bufferRowLength == 0)
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;

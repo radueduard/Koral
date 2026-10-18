@@ -181,6 +181,28 @@ class ResourcesTest {
         }.waitBlocking()
         assertEquals(listOf(11, 21, 31, 41), output.readInts().toList(), "read through the index")
 
+        // The buffer itself, pushed: its index is asked for on the way.
+        output.write(intArrayOf(0, 0, 0, 0))
+        CommandBuffer.singleTimeCommand(CommandBufferUsage.eCompute) {
+            it.bindComputePipeline(pipeline).bind("data", output).pushConstant("source", input).dispatch()
+        }.waitBlocking()
+        assertEquals(listOf(11, 21, 31, 41), output.readInts().toList(), "read through the pushed buffer")
+
+        // A class holding the buffer, pushed field by field: its `source` is the block's `source`.
+        data class Push(val source: Buffer)
+        output.write(intArrayOf(0, 0, 0, 0))
+        CommandBuffer.singleTimeCommand(CommandBufferUsage.eCompute) {
+            it.bindComputePipeline(pipeline).bind("data", output).pushConstants(Push(input)).dispatch()
+        }.waitBlocking()
+        assertEquals(listOf(11, 21, 31, 41), output.readInts().toList(), "read through a pushed struct's buffer")
+
+        // The same through pushConstantBlock: a class holding a resource has no bytes, so it is pushed by name.
+        output.write(intArrayOf(0, 0, 0, 0))
+        CommandBuffer.singleTimeCommand(CommandBufferUsage.eCompute) {
+            it.bindComputePipeline(pipeline).bind("data", output).pushConstantBlock(Push(input)).dispatch()
+        }.waitBlocking()
+        assertEquals(listOf(11, 21, 31, 41), output.readInts().toList(), "read through a block-pushed struct's buffer")
+
         val heap = DescriptorHeap.Builder().setSlotCount(2).build()
         if (Context.activeDescriptorModel != DescriptorModel.eHeap) {
             assertTrue(heap.isPoisoned, "no project heap under descriptor sets")

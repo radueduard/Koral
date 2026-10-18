@@ -1,0 +1,29 @@
+{
+  "name": "koral-slang-grammar",
+  "displayName": "Slang grammar (from the Slang VS Code extension)",
+  "version": "2.0.10",
+  "license": "Apache-2.0 WITH LLVM-exception",
+  "contributes": {
+    "languages": [
+      {
+        "id": "slang",
+        "aliases": [
+          "Slang",
+          "slang"
+        ],
+        "extensions": [
+          ".slang",
+          ".slangh"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "slang",
+        "scopeName": "source.slang",
+        "path": "./syntaxes/slang.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -689,7 +689,7 @@ namespace kor
         kor::u64 bufferRowLength = 0;           ///< Row pitch in *texels*, for buffer memory with padding between rows. The default (0) means rows are tightly packed, i.e. equal to @ref imageExtent.x.
         kor::u64 bufferImageHeight = 0;         ///< Slice pitch in *rows*, for buffer memory with padding between 2D slices. The default (0) means slices are tightly packed, i.e. equal to @ref imageExtent.y.
         kor::IVec3 imageOffset = { 0, 0, 0 };   ///< Texel coordinate in the image the copied region starts at.
-        kor::IVec3 imageExtent = { -1, -1, -1 };///< Size of the copied region in texels. The default (-1) means the image's full extent.
+        kor::IVec3 imageExtent = { -1, -1, -1 };///< Size of the copied region in texels. The default (-1) means the whole of the mip level copied (@ref imageMipLevel).
         kor::u32 imageBaseArrayLayer = 0;       ///< First array layer copied.
         kor::u32 imageLayerCount = 1;           ///< How many array layers to copy, starting from @ref imageBaseArrayLayer.
         kor::u32 imageMipLevel = 0;             ///< Mip level copied.

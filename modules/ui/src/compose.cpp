@@ -400,6 +400,28 @@ namespace kui
         return make<RenderCustomLayout, Rule>(std::move(layout), std::move(children), [](RenderCustomLayout& r, const Rule& c) { r.Set(c); });
     }
 
+    Widget Wrap(std::vector<Widget> children, const float spacing, const float runSpacing)
+    {
+        return CustomLayout([spacing, runSpacing](LayoutContext& context, const BoxConstraints& constraints) {
+            const bool bounded = constraints.HasBoundedWidth();
+            const float most = bounded ? constraints.maxWidth : Infinity;
+            float x = 0.f, y = 0.f, line = 0.f, widest = 0.f;
+            for (std::size_t i = 0; i < context.count; ++i) {
+                const kor::Vec2 size = context.measure(i, BoxConstraints { 0.f, most, 0.f, Infinity });
+                // Onto the next line when it would go past the end of this one (and this one has something on it).
+                if (x > 0.f && x + size.x > most) {
+                    y += line + runSpacing;
+                    x = line = 0.f;
+                }
+                context.place(i, { x, y });
+                widest = std::max(widest, x + size.x);
+                x += size.x + spacing;
+                line = std::max(line, size.y);
+            }
+            return constraints.Constrain({ bounded ? constraints.maxWidth : widest, context.count ? y + line : 0.f });
+        }, std::move(children));
+    }
+
     Widget PopupAnchor(const bool open, Widget popup, std::function<void()> onDismiss, const kor::Vec2 offset, const bool below)
     {
         return make<RenderPopupAnchor, RenderPopupAnchor::Config>({ open, std::move(popup), std::move(onDismiss), offset, below }, {},

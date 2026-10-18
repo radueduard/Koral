@@ -93,6 +93,7 @@ struct Card : kui::StatelessWidget {
 | `RepaintBoundary`, `Opacity` | A layer of its own: repaints alone; opacity costs nothing to change |
 | `ClipRRect(radius, child)` | The child, cut to its box with rounded corners |
 | `Translate(offset, child)` | The child, moved where it paints and is hit; layout unchanged. A click still reaches it only inside its parent's box |
+| `Wrap(children, spacing, runSpacing)` | Side by side, as many to a line as fit the width, the rest on the lines under |
 
 | Controls | |
 |---|---|
@@ -221,7 +222,9 @@ was open; the button of the panel that is open folds the area away.
 | at the foot of a stripe | along the bottom, which runs from one stripe to the other under both sides: the left stripe's in its left part, the right stripe's in its right (`DockArea::eBottomLeft`, `eBottomRight`) |
 
 The middle is whatever the sides and the bottom leave: empty, it shows the scene and lets the pointer
-through; panels docked there (`DockArea::eCenter`, or `Dock(panel)` as above) are tabs. An open panel has a
+through; panels docked there (`DockArea::eCenter`, or `Dock(panel)` as above) are tabs. It can be in two
+parts side by side, each with its own tabs and a line between them to drag: `DockArea::eCenterRight` is the
+right one, and a part that loses its last panel leaves the other all of the middle. An open panel has a
 title bar — its title on the left; on the right a button that folds it away and, when it is closable, one
 that closes it.
 
@@ -236,7 +239,8 @@ With the mouse:
 | onto the lower part of a panel docked down a side | docks under it, as a part of its own |
 | into the left or right margin of the space (within 15% of that edge) | docks down that side: the margin is one band a level of the side, and one more — a level's band joins that level, the last makes a level of its own under them |
 | into the bottom margin of the space | docks along the bottom: in its left part from the left half, its right from the right |
-| into the middle (onto its title bar, or the 30% about its centre) | docks there, a tab among whatever else is in the middle |
+| into the middle (onto a part's title bar, or the 30% about its centre) | docks there, a tab among whatever else is in that part |
+| over the right edge of the middle, while it is in one part | becomes the middle's right part |
 | anywhere else in the space | floats there, where its title bar moves it and its corner resizes it |
 | out of the window | floats over the desktop (one see-through, click-through window over every monitor) |
 
@@ -291,7 +295,17 @@ auto editor = kui::NodeEditor(graph, kui::NodeEditorOptions{}
 | Move | Drag a node: everything picked moves. Drag a comment's title: it moves with the nodes inside it. Its corner resizes it. |
 | Wire | Drag from a port to one it fits: the same type, or whatever `canConnect` says. Drag off a wired input to pick the wire up. A wire let go over nothing goes to `onWireDropped`. |
 | Keys | Delete removes what is picked. Control+C, V and D copy, paste at the pointer and duplicate. |
-| Menu | A right click on nothing calls `onContextMenu` with where in the graph it was. |
+| Menu | The right button let go where it was pressed opens the menu `menu` gives (`Menu(...)`): for the node under it, picked with whatever else is, or for nothing. With no menu — or an empty one, over nothing — `onContextMenu` is called with where in the graph it was. |
+| Pressed twice | A node pressed twice goes to `onActivate`. |
+| Frames | A comment with `around` is a frame round those nodes, wherever they are: dragged by its title it carries them, and it has no corner to resize. |
+
+A port's `value`, for an input given a value where a wire could go, is said faintly beside its label.
+
+**Where it looks**, given a `kui::NodeEditorView` (`SetView`), is the caller's: its `centre`, `zoom`, `size` and
+`origin` say where the editor is and what it shows (`ToView`, `ToGraph` between the two), `Frame()` frames the
+page and `Reveal(id)` picks a node and brings it into view, from the next layout. It is kept a page at a time:
+set `page` before each build, and a page is looked at where it was left — one shown for the first time is framed
+whole, once it has a node.
 
 A node with an `error` is outlined in red and shows it. Where the view looks, how near, what is picked and
 any drag under way are the editor's own, so panning, zooming and dragging build nothing again, and what is

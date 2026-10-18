@@ -588,6 +588,37 @@ TEST_F(WidgetTest, ScrollingMovesALayerAndRepaintsNothing) {
     EXPECT_TRUE(IsGreen(scene->At(10, 4))) << "row 3 (green) is at the top now";
 }
 
+TEST_F(WidgetTest, AScrollBarIsDraggedAndItsTrackPressed) {
+    // Ten rows of sixteen in a view of sixty-four: the first five red, the rest green. The bar is along the right edge.
+    std::vector<kui::Widget> rows;
+    for (int i = 0; i < 10; ++i) rows.push_back(kui::SizedBox(64.f, 16.f, kui::DecoratedBox({ .color = i < 5 ? Red : Green }, {})));
+    Show(kui::ScrollView(kui::Column(std::move(rows))));
+    EXPECT_TRUE(IsRed(scene->At(10, 4)));
+
+    // Pressed low on its track, past the thumb: the thumb goes there, and the view with it — to the end.
+    Click({ 61.f, 60.f });
+    settle();
+    EXPECT_TRUE(IsGreen(scene->At(10, 4))) << "the last rows are in view";
+
+    // The thumb, held where it is and dragged up the track: back to the start.
+    auto& input = scene->SceneInput();
+    input.FeedMousePosition({ 61.f, 50.f });
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, true);
+    settle();
+    for (const float y : { 40.f, 25.f, 10.f, 0.f }) { input.FeedMousePosition({ 61.f, y }); settle(); }
+    input.FeedMouseButton(kor::MouseButton::eLeft, false);
+    settle();
+    settle();
+    EXPECT_TRUE(IsRed(scene->At(10, 4))) << "the first rows are in view again";
+    EXPECT_TRUE(IsRed(scene->At(10, 60)));
+
+    // Pressed on the content, nothing of it: what is under the pointer has the press.
+    Click({ 20.f, 40.f });
+    settle();
+    EXPECT_TRUE(IsRed(scene->At(10, 4)));
+}
+
 TEST_F(WidgetTest, WhatIsScrolledFarOutOfViewIsNotPainted) {
     // Two hundred rows of sixteen in a view of sixty-four: fifty views of content.
     std::vector<int> painted(200, 0);
@@ -1956,6 +1987,115 @@ TEST_F(DockTest, DroppedInTheMiddleItIsATabThere) {
     EXPECT_TRUE(layout->IsShown("scene"));
 }
 
+// The middle in two parts, side by side: docked so, dropped on its right edge so, and kept so by Save and Load.
+TEST_F(DockTest, TheMiddleCanBeInTwoParts) {
+    // The log held over the right edge of the scene — the middle's only part — is the middle's right part.
+    Drag({ 19.f, 141.f }, { 133.f, 54.f });
+    EXPECT_FALSE(layout->IsFloating("log"));
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_TRUE(layout->IsShown("scene")) << "beside it, not behind it";
+    EXPECT_GT(view.x, 20.f);
+    EXPECT_GT(log.x, 20.f);
+    EXPECT_NEAR(view.y, log.y, 1.f) << "side by side, as tall as each other";
+    layout->Hide("log");
+    EXPECT_TRUE(layout->IsShown("log")) << "a part of the middle is not folded away";
+
+    // Saved and loaded, it is there again; and the left part taken away, the right has all of the middle.
+    const std::string saved = layout->Save();
+    const auto parts = [](const std::string& text) {
+        std::size_t count = 0;
+        for (std::size_t at = text.find("group center"); at != std::string::npos; at = text.find("group center", at + 1)) ++count;
+        return count;
+    };
+    EXPECT_EQ(parts(saved), 2u);
+    auto again = std::make_shared<kui::DockLayout>();
+    ASSERT_TRUE(again->Load(saved));
+    EXPECT_EQ(again->Save(), saved);
+    layout->Dock("scene", kui::DockArea::eLeft);
+    settle(); settle();
+    EXPECT_TRUE(layout->IsShown("log"));
+    layout->Dock("scene", kui::DockArea::eCenter);
+    settle(); settle();
+    EXPECT_TRUE(layout->IsShown("scene") && layout->IsShown("log")) << "two parts again: the scene's on the left of the log's";
+    EXPECT_GT(view.x, 20.f);
+    EXPECT_GT(log.x, 20.f);
+}
+
+// The middle in as many parts as are made: dropped on a part's left edge, a part left of it; and docked by number.
+// (What the panels are told is how big each is: which is where, from the left, is the order the layout saves them in.)
+TEST_F(DockTest, TheMiddleCanBeInManyParts) {
+    const auto order = [&] {
+        std::string out;
+        const std::string saved = layout->Save();
+        for (std::size_t at = saved.find("group center"); at != std::string::npos; at = saved.find("group center", at + 1)) {
+            const std::string line = saved.substr(at, saved.find('\n', at) - at);
+            for (const char* panel : { "scene", "log", "inspector" })
+                if (line.find(std::string(" \"") + panel + "\"", line.find('"', line.find('"') + 1) + 1) != std::string::npos) out += panel[0];
+        }
+        return out;
+    };
+    Drag({ 19.f, 141.f }, { 133.f, 54.f });
+    ASSERT_TRUE(layout->IsShown("scene") && layout->IsShown("log"));
+    ASSERT_EQ(order(), "sl");
+    // The scene's part is the left half of the middle, which starts at the edge now that the left stripe is gone: its
+    // left edge takes the inspector, a part of its own left of it.
+    Drag({ 221.f, 19.f }, { 5.f, 60.f });
+    EXPECT_FALSE(layout->IsFloating("inspector"));
+    EXPECT_TRUE(layout->IsShown("inspector") && layout->IsShown("scene") && layout->IsShown("log")) << "three, none behind another";
+    EXPECT_EQ(order(), "isl");
+    EXPECT_GT(inspector.x, 20.f);
+    EXPECT_NEAR(inspector.x, view.x, 2.f) << "the middle shared out among them";
+    EXPECT_NEAR(view.x, log.x, 2.f);
+    EXPECT_NEAR(inspector.y, view.y, 1.f) << "side by side, as tall as each other";
+
+    // Saved and loaded, all three are there, in that order.
+    const std::string saved = layout->Save();
+    auto again = std::make_shared<kui::DockLayout>();
+    ASSERT_TRUE(again->Load(saved));
+    EXPECT_EQ(again->Save(), saved);
+
+    // Docked by number, from the left: the log in the third part, the inspector in the second, the scene the first.
+    layout->Dock("log", kui::DockArea::eCenter, 2);
+    layout->Dock("inspector", kui::DockArea::eCenter, 1);
+    layout->Dock("scene", kui::DockArea::eCenter, 0);
+    settle(); settle();
+    EXPECT_EQ(order(), "sil");
+    // And eCenterRight is a part of its own, right of them all.
+    layout->Dock("scene", kui::DockArea::eCenterRight);
+    settle(); settle();
+    EXPECT_EQ(order(), "ils");
+    EXPECT_TRUE(layout->IsShown("inspector") && layout->IsShown("scene") && layout->IsShown("log"));
+}
+
+// A panel Activated before the dock space has placed anything stays in front of a tab placed after it.
+TEST_F(DockTest, APanelActivatedBeforeItIsPlacedStaysInFront) {
+    auto fresh = std::make_shared<kui::DockLayout>();
+    fresh->Dock("scene").Dock("log", kui::DockSide::eCenter, "scene");
+    fresh->Activate("scene");
+    scene->ui.SetRoot(kui::DockSpace(fresh, {
+        { "scene", "Scene", kui::Make<Tapped>(nullptr, &view) },
+        { "log", "Log", kui::Make<Tapped>(nullptr, &log) },
+    }));
+    settle(); settle();
+    EXPECT_TRUE(fresh->IsShown("scene"));
+    EXPECT_FALSE(fresh->IsShown("log")) << "a tab behind it";
+    fresh->Activate("log");
+    EXPECT_TRUE(fresh->IsShown("log")) << "and brought forward when it is asked to be";
+}
+
+// A tab of the middle closed before it was ever seen, and opened: it is in front.
+TEST_F(DockTest, AMiddleTabClosedAndOpenedIsInFront) {
+    layout->Dock("log", kui::DockSide::eCenter, "scene");
+    layout->Close("log");
+    settle(); settle();
+    EXPECT_TRUE(layout->IsShown("scene"));
+    layout->Open("log");
+    settle(); settle();
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_FALSE(layout->IsShown("scene"));
+    EXPECT_GT(log.x, 20.f) << "drawn, not only said to be";
+}
+
 // A side has levels, and its margin a band for each and one more: where a panel is let go says which level it joins.
 TEST(DockLevels, ASidesMarginHasABandForEachLevelAndOneMore) {
     if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
@@ -2679,6 +2819,136 @@ TEST_F(NodeTest, ANodesOwnControlsWorkAndDoNotDragIt) {
     settle();
     Click(button / 1.15f);
     EXPECT_EQ(pressed, 2);
+}
+
+// A view given to the editor is the caller's: it says where the editor is and what it looks at, and is kept a page
+// at a time — a page first shown is framed whole, and one shown again is where it was left.
+TEST_F(NodeTest, AViewIsKeptAPageAtATime) {
+    auto view = std::make_shared<kui::NodeEditorView>();
+    kui::NodeGraph one = TwoNodes(), two;
+    two.nodes.push_back({ .id = "C", .title = "C", .position = { 1000.f, 600.f } });
+    const auto showPage = [&](const std::string& page) {
+        view->page = page;
+        Show(kui::NodeEditor(page == "one" ? one : two, kui::NodeEditorOptions{}.SetView(view)));
+    };
+    showPage("one");
+    EXPECT_EQ(view->size, kor::Vec2(static_cast<float>(W), static_cast<float>(H)));
+    EXPECT_EQ(view->origin, kor::Vec2(0.f));
+    EXPECT_NEAR(view->centre.x, 190.f, 0.5f) << "framed whole: A from 20 to B's end at 360";
+    EXPECT_NEAR(view->ToView(view->centre).x, W * 0.5f, 0.01f);
+    EXPECT_NEAR(view->ToGraph(view->ToView({ 33.f, 44.f })).y, 44.f, 0.01f);
+
+    // Panned 50 to the right with the right button: the view says so.
+    const float zoom = view->zoom;
+    Drag({ 100.f, 250.f }, { 150.f, 250.f }, kor::MouseButton::eRight);
+    const kor::Vec2 left = view->centre;
+    EXPECT_NEAR(left.x, 190.f - 50.f / zoom, 0.5f);
+
+    showPage("two");
+    EXPECT_NEAR(view->centre.x, 1070.f, 0.5f) << "another page, never shown: framed whole";
+    showPage("one");
+    EXPECT_NEAR(view->centre.x, left.x, 0.01f) << "back where it was left";
+    EXPECT_FLOAT_EQ(view->zoom, zoom);
+
+    // Asked to frame it, it does, from the next layout, without being built again.
+    view->Frame();
+    settle();
+    EXPECT_NEAR(view->centre.x, 190.f, 0.5f);
+    // A page shown with nothing on it is framed when it has something.
+    view->page = "three";
+    Show(kui::NodeEditor(kui::NodeGraph {}, kui::NodeEditorOptions{}.SetView(view)));
+    kui::NodeGraph three;
+    three.nodes.push_back({ .id = "D", .title = "D", .position = { -500.f, -400.f } });
+    Show(kui::NodeEditor(three, kui::NodeEditorOptions{}.SetView(view)));
+    EXPECT_NEAR(view->centre.x, -500.f + kui::nodes::MinWidth * 0.5f, 0.5f);
+}
+
+TEST_F(NodeTest, ANodeRevealedIsPickedAndInView) {
+    auto view = std::make_shared<kui::NodeEditorView>();
+    auto graph = TwoNodes();
+    graph.nodes.push_back({ .id = "far", .title = "Far", .position = { 3000.f, 2000.f } });
+    std::vector<std::string> deleted;
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}.SetView(view).OnDelete([&](const std::vector<std::string>& n, const auto&, const auto&) { deleted = n; })));
+    Click({ 200.f, 280.f });    // the keyboard is the editor's
+    view->Frame();
+    settle();
+    const float zoom = view->zoom;
+    view->Reveal("far");
+    settle();
+    EXPECT_NEAR(view->centre.x, 3000.f + kui::nodes::MinWidth * 0.5f, 1.f) << "brought into view";
+    EXPECT_FLOAT_EQ(view->zoom, zoom) << "as near as it was";
+    Key(kor::Key::eDelete);
+    EXPECT_EQ(deleted, std::vector<std::string>{ "far" }) << "and picked";
+}
+
+TEST_F(NodeTest, ANodePressedTwiceIsActivated) {
+    std::vector<std::string> activated;
+    Show(kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}.OnActivate([&](const std::string& n) { activated.push_back(n); })));
+    Click({ 60.f, 30.f });
+    EXPECT_TRUE(activated.empty()) << "once is a press";
+    Click({ 60.f, 30.f });
+    EXPECT_EQ(activated, std::vector<std::string>{ "A" });
+    Click({ 260.f, 30.f });
+    EXPECT_EQ(activated.size(), 1u) << "another node's press is its first";
+}
+
+TEST_F(NodeTest, TheRightButtonOpensTheCallersMenu) {
+    std::vector<std::string> askedFor { "nothing yet" };
+    kor::Vec2 askedAt {}, contextAt { -1.f };
+    int chosen = 0;
+    bool empty = false;
+    const auto rightClick = [&](const kor::Vec2 at) { Move(at); Button(kor::MouseButton::eRight, true); Button(kor::MouseButton::eRight, false); };
+    Show(kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}
+        .Menu([&](const std::vector<std::string>& nodes, const kor::Vec2 at) {
+            askedFor = nodes;
+            askedAt = at;
+            return empty ? std::vector<kui::MenuItem> {} : std::vector<kui::MenuItem> { { "Do it", [&] { ++chosen; } }, { "Not this", [] {} } };
+        })
+        .OnContextMenu([&](const kor::Vec2 at, kor::Vec2) { contextAt = at; })));
+    rightClick({ 260.f, 30.f });
+    EXPECT_EQ(askedFor, std::vector<std::string>{ "B" }) << "the node under it, picked";
+    Click(kor::Vec2(260.f, 30.f) + kor::Vec2(40.f, 6.f + 18.f));     // the menu's first line
+    EXPECT_EQ(chosen, 1);
+
+    rightClick({ 200.f, 250.f });
+    EXPECT_TRUE(askedFor.empty()) << "over nothing: for no node";
+    EXPECT_NEAR(askedAt.x, 200.f, 0.01f);
+    EXPECT_EQ(contextAt, kor::Vec2(-1.f)) << "the menu is what it opened";
+    Key(kor::Key::eEsc);
+
+    empty = true;
+    rightClick({ 200.f, 250.f });
+    EXPECT_NEAR(contextAt.x, 200.f, 0.01f) << "no menu: told as before";
+}
+
+TEST_F(NodeTest, AFrameGoesRoundItsNodesAndCarriesThem) {
+    std::vector<std::string> moved;
+    kor::Vec2 by {};
+    bool changed = false;
+    auto graph = TwoNodes();
+    graph.comments.push_back({ .id = "loop", .text = "Loop", .around = { "A" } });
+    graph.nodes[1].inputs[1].value = "4";
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}
+        .OnMove([&](const std::vector<std::string>& n, const kor::Vec2 b) { moved = n; by = b; })
+        .OnCommentChanged([&](const std::string&, kui::Rect) { changed = true; })));
+    // Its title runs along over A, which is at 20: from 20 - 16 - 26 - 8 = -14 down to 12.
+    Drag({ 100.f, 6.f }, { 130.f, 26.f });
+    EXPECT_EQ(moved, std::vector<std::string>{ "A" });
+    EXPECT_NEAR(by.x, 30.f, 0.01f);
+    EXPECT_FALSE(changed) << "a frame is where its nodes are: there is no rectangle of its own to change";
+}
+
+TEST_F(NodeTest, WrapPutsWhatDoesNotFitOnTheNextLine) {
+    const kui::Color mark = kui::Color::Hex(0xFF00FF);
+    std::vector<kui::Widget> boxes;
+    for (int i = 0; i < 4; ++i) boxes.push_back(kui::SizedBox(100.f, 20.f).Background(mark));
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::SizedBox(W, H, kui::Wrap(std::move(boxes), 10.f, 5.f))));
+    const auto marked = [&](const int x, const int y) { const auto p = scene->At(x, y); return p.x > 200 && p.y < 60 && p.z > 200; };
+    EXPECT_TRUE(marked(50, 10));
+    EXPECT_TRUE(marked(270, 10)) << "the third, at 220";
+    EXPECT_FALSE(marked(380, 10)) << "a fourth would end at 430: it is not on the first line";
+    EXPECT_TRUE(marked(50, 35)) << "but on the second, 5 under the first";
+    EXPECT_FALSE(marked(50, 22));
 }
 
 TEST_F(NodeTest, KeysCopyPasteAndDuplicateWhatIsPicked) {

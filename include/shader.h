@@ -191,6 +191,17 @@ namespace kor
             /// fields above and for the same reasons. @see ImageShape
             ImageShape shape = ImageShape::eUnknown;
 
+            /// What the binding itself was annotated with — `[entity("PER_INSTANCE")]` on the buffer — and from
+            /// which module; empty when it was not. Last, defaulted and outside operator<=>, like the fields above.
+            std::string semanticNamespace;
+            std::string semantic;
+
+            /// For a storage buffer that is an array of a struct — a `StructuredBuffer<T>` — one element's
+            /// fields, each where it is within the element, and how far apart elements are. Empty otherwise:
+            /// @ref members then has the block's own. Last, defaulted and outside operator<=>, like the fields above.
+            std::vector<BlockMember> elementMembers;
+            kor::u32 elementStride = 0;
+
             // Identity is the *interface* only: type, name, count. Access is a function of
             // the type and adds nothing to compare, and stages are unioned across shaders
             // rather than compared. Keeping this narrow is what lets Pipeline::BuildLayouts
@@ -235,6 +246,17 @@ namespace kor
             /// engine can lay out itself. Aggregates are still writable, but only as raw bytes of
             /// exactly @ref size, since C++ says nothing about what is inside one.
             bool aggregate = false;
+
+            /// A Slang `T.Handle` (DescriptorHandle<T>): the kor::BindlessKind of the table it indexes, as a
+            /// plain byte; 0 (eNone) for anything else. In the SPIR-V it is a uint2, index first.
+            kor::u8 handle = 0;
+
+            /// An entry point's `uniform` parameter (Slang's `uniform Push push`): its fields are also found by
+            /// their own names. @see Pipeline::FindPushConstant
+            bool parameter = false;
+
+            /// @ref handle for a handle to a descriptor no bindless table holds: a texel buffer, a combined sampler.
+            static constexpr kor::u8 NoTable = 0xFF;
         };
 
         /** @brief A push-constant block the shader declares. */
@@ -481,6 +503,15 @@ namespace kor
                                std::vector<BlockMember>& members,
                                kor::u32& blockSize) const;
 
+        /** @brief The members of struct @p typeId, each where it is in the struct. @see FetchBlockMembers */
+        void FetchStructMembers(const spirv_cross::Compiler& module, kor::u32 typeId, std::vector<BlockMember>& members) const;
+
+        /** @brief A storage block that is an array of a struct: one element's fields, and the array's stride. */
+        void FetchElementMembers(const spirv_cross::Compiler& module,
+                                 const spirv_cross::Resource& resource,
+                                 std::vector<BlockMember>& members,
+                                 kor::u32& stride) const;
+
         /**
          * @brief Flattens a push-constant block into every path that can be written on its own.
          * @param type The struct being walked — the block itself, or one nested in it.
@@ -491,10 +522,10 @@ namespace kor
          * to match the shader's: whatever the layouts disagree about, each leaf is written where
          * the shader put it. @see PushConstantField
          */
-        static void FlattenPushConstant(const spirv_cross::Compiler& module,
+        void FlattenPushConstant(const spirv_cross::Compiler& module,
                                         const spirv_cross::SPIRType& type,
                                         const std::string& prefix, kor::u32 baseOffset,
-                                        std::vector<PushConstantField>& out);
+                                        std::vector<PushConstantField>& out) const;
 
         /**
          * @brief Reads the semantic annotations out of the shader's own source.
@@ -598,6 +629,13 @@ namespace kor
         /// Slang calls the parameter rarely survives into the SPIR-V. GLSL's inputs are annotated
         /// like its block members are and arrive through _fieldSemantics instead. @see vertexLayout.h
         std::map<kor::u32, FieldSemantic> _inputSemantics;
+
+        /// Push-constant path -> kor::BindlessKind (as a byte) of a Slang `T.Handle` there. Only Slang
+        /// knows a handle from a uint2. @see PushConstantField::handle
+        std::map<std::string, kor::u8> _pushHandles;
+
+        /// The entry point's parameter names (Slang). @see PushConstantField::parameter
+        std::set<std::string> _entryParameters;
 
         /// Descriptor name (and block type name) -> the SPIR-V variables so named: what SpirvWith rewrites.
         std::map<std::string, std::vector<kor::u32>, std::less<>> _descriptorVariables;

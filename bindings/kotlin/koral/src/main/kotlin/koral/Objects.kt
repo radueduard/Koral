@@ -196,6 +196,11 @@ class Input internal constructor(internal val native: MemorySegment) {
         const val MaxGamepads = 4
         /** The input of the scene running on this thread. */
         val current: Input get() = Input(current(KoralNative.koral_current_input(), "Input.current"))
+        /** The input a library built on Koral hands over, as a `KoralInput*`: an engine's, for the scripts it runs. */
+        fun of(native: MemorySegment): Input {
+            if (native == MemorySegment.NULL) throw KoralException("there is no input there")
+            return Input(native)
+        }
         fun describe(key: Key): String = KoralNative.koral_input_describe_key(key.value)
         fun describe(button: MouseButton): String = KoralNative.koral_input_describe_mouse_button(button.value)
     }
@@ -317,6 +322,14 @@ class DebugDraw internal constructor(internal val native: MemorySegment) {
     fun clear() = KoralNative.koral_debug_clear(native)
     val lineCount: Long get() = KoralNative.koral_debug_line_count(native)
     val triangleCount: Long get() = KoralNative.koral_debug_triangle_count(native)
+
+    companion object {
+        /** The debug lines a library built on Koral hands over, as a `KoralDebugDraw*`: an engine's scene's, for its scripts. */
+        fun of(native: MemorySegment): DebugDraw {
+            if (native == MemorySegment.NULL) throw KoralException("there are no debug lines there")
+            return DebugDraw(native)
+        }
+    }
 }
 
 /** The debug lines of the scene running on this thread: kor::Debug::. */

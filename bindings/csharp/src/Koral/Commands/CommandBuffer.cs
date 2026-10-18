@@ -228,6 +228,12 @@ public sealed unsafe partial class CommandBuffer : IDisposable
     }
 
     /// <summary>
+    /// PushConstantBlock for a class or record — or a struct holding a resource — that mirrors the shader's struct: it
+    /// has no bytes to copy, so it is pushed field by field by name, as <see cref="PushConstants(object)"/> does.
+    /// </summary>
+    public CommandBuffer PushConstantBlock(object value) => PushConstants(value);
+
+    /// <summary>
     /// PushConstant(name, data): the push constant the shaders call <paramref name="name"/> — checked, by
     /// what <typeparamref name="T"/> is, against what they declare it as.
     /// </summary>
@@ -236,6 +242,70 @@ public sealed unsafe partial class CommandBuffer : IDisposable
         var shape = ValueShape.Of<T>().Native;
         fixed (T* pointer = &data) KoralNative.koral_cmd_push_constant(N, name, pointer, (uint)sizeof(T), &shape);
         return this;
+    }
+
+    /// <summary>
+    /// PushConstant(name, value) for what is not plain data: a class or record — or a struct holding one — that
+    /// mirrors the shader's struct, pushed field by field as "<paramref name="name"/>.field". So it needs no padding to
+    /// match the shader's, and a field can be anything a push constant takes: an Image, Buffer or other resource (its
+    /// bindless index), a <see cref="DescriptorIndex"/>, a number, a vector, or another such type. Null fields are
+    /// skipped, and a PascalCase member pushes the camelCase field (<c>Output</c> → <c>output</c>). (An unmanaged struct goes through <see cref="PushConstant{T}(string, in T)"/> instead, copied as it stands.)
+    /// </summary>
+    public CommandBuffer PushConstant(string name, object value) => PushBoxed(name, value);
+
+    /// <summary>
+    /// Every field and property of <paramref name="value"/> pushed by its own name, as a push-constant block's fields
+    /// are named (<c>[[vk::push_constant]] cbuffer Push { ... }</c>). For an entry point's <c>uniform Push push</c>,
+    /// push it by name instead: <c>PushConstant("push", value)</c>.
+    /// </summary>
+    public CommandBuffer PushConstants(object value) { PushFields("", value); return this; }
+
+    private CommandBuffer PushBoxed(string name, object value)
+    {
+        switch (value)
+        {
+        case Resource resource: return PushConstant(name, resource);
+        case DescriptorIndex index: return PushConstant(name, index);
+        }
+        var type = value.GetType();
+        if (!ContainsReferences(type))
+        {
+            PushValueMethod.MakeGenericMethod(type).Invoke(this, [name, value]);
+            return this;
+        }
+        PushFields(name + ".", value);
+        return this;
+    }
+
+    private static readonly System.Reflection.MethodInfo PushValueMethod =
+        typeof(CommandBuffer).GetMethod(nameof(PushValue), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+    private void PushValue<T>(string name, T value) where T : unmanaged => PushConstant(name, in value);
+
+    // A struct of plain data is copied whole — a DescriptorIndex in it too, laid out as a handle's two words, and the
+    // engine still sees it if the shader's field is a handle. Resources are classes: a type holding one is walked.
+    private static bool ContainsReferences(Type type) =>
+        !type.IsValueType || (!type.IsPrimitive && !type.IsEnum && !type.IsPointer &&
+            type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
+                .Any(f => ContainsReferences(f.FieldType)));
+
+    // C#'s members are PascalCase and a shader's fields camelCase: `Output` pushes `output`. A name that starts with
+    // an acronym (`MVP`) is left as it is.
+    private static string ShaderName(string member) =>
+        member.Length > 1 && char.IsUpper(member[0]) && char.IsLower(member[1]) ? char.ToLowerInvariant(member[0]) + member[1..] : member;
+
+    private void PushFields(string prefix, object value)
+    {
+        const System.Reflection.BindingFlags Public = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+        var type = value.GetType();
+        foreach (var field in type.GetFields(Public))
+            if (field.GetValue(value) is { } v) PushBoxed(prefix + ShaderName(field.Name), v);
+        foreach (var property in type.GetProperties(Public))
+        {
+            if (!property.CanRead || property.GetIndexParameters().Length != 0) continue;
+            if (property.DeclaringType == typeof(object) || property.Name == "EqualityContract") continue;
+            if (property.GetValue(value) is { } v) PushBoxed(prefix + ShaderName(property.Name), v);
+        }
     }
 
     /// <summary>An array push constant: <c>float weights[4]</c> is four floats.</summary>
@@ -261,6 +331,13 @@ public sealed unsafe partial class CommandBuffer : IDisposable
 
     /// <summary>PushConstant(name, index): the index into the uint the shader calls <paramref name="name"/>, and the resource behind it into the uses of what follows.</summary>
     public CommandBuffer PushConstant(string name, DescriptorIndex index) { KoralNative.koral_cmd_push_index(N, name, index.Native); return this; }
+
+    /// <summary>
+    /// PushConstant(name, resource): an image, image view, buffer, sampler or acceleration structure as its bindless
+    /// index, asked for on the way, into the uint the shader calls <paramref name="name"/>. Which table follows from
+    /// its usage, or from which tables the bound pipeline reads; push a <see cref="DescriptorIndex"/> when neither settles it.
+    /// </summary>
+    public CommandBuffer PushConstant(string name, Resource resource) { KoralNative.koral_cmd_push_resource(N, name, resource.Handle); return this; }
 
     /// <summary>Uses(index): the resource behind a bindless index the shader reaches some other way than by a push.</summary>
     public CommandBuffer Uses(DescriptorIndex index) { KoralNative.koral_cmd_uses_index(N, index.Native); return this; }

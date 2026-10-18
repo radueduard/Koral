@@ -5,8 +5,10 @@
 //
 
 #include <kui/nodes.h>
+#include <kui/icons.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <map>
 #include <optional>
@@ -26,6 +28,8 @@ namespace kui
         constexpr float CommentTitle = 26.f;   // the strip along a comment's top that drags it
         constexpr float CommentCorner = 14.f;  // the square in its bottom-right that resizes it
         constexpr float DragThreshold = 3.f;   // in the view's units: less than this, a press is a click
+        constexpr float FramePad = 16.f;       // round the nodes a comment is a frame round
+        constexpr auto Twice = std::chrono::milliseconds(400);   // between two presses of a node that are one press twice
 
         Color Resolve(const Color color, const Color fallback) { return color.a < 0.f ? fallback : color; }
 
@@ -60,9 +64,21 @@ namespace kui
                 NodeEditorOptions options;
             };
 
+            ~RenderNodeCanvas() override { Let(); }
+
             void Set(const Config& config)
             {
                 _config = config;
+                // Where it looks: the caller's, or its own.
+                if (const auto& given = _config.options.view; given ? given != _view : !_own) {
+                    Let();
+                    _own = !given;
+                    _view = given ? given : std::make_shared<NodeEditorView>();
+                    _placed = false;
+                }
+                _view->kept.editor = this;
+                _view->kept.wake = [this] { MarkNeedsLayout(); MarkNeedsPaint(); };
+                if (!_own) TurnTo(_view->page);
                 // What was picked and has gone since is not picked.
                 std::erase_if(_pickedNodes, [&](const std::string& id) { return !FindNode(id); });
                 std::erase_if(_pickedComments, [&](const std::string& id) { return !FindComment(id); });
@@ -78,7 +94,10 @@ namespace kui
             void PerformLayout() override
             {
                 const auto& c = Constraints();
+                const kor::Vec2 before = Size();
                 SetSize(c.Constrain({ c.HasBoundedWidth() ? c.maxWidth : 800.f, c.HasBoundedHeight() ? c.maxHeight : 600.f }));
+                // Made bigger or smaller, what is at its top-left stays there. (From nothing, it was never seen: it is placed below.)
+                if (_placed && before.x > 0.f && before.y > 0.f && before != Size()) _view->centre += (Size() - before) * 0.5f / _view->zoom;
                 for (std::size_t i = 0; i < _children.size() && i < _config.graph.nodes.size(); ++i) {
                     const auto& node = _config.graph.nodes[i];
                     // As wide as it asks to be, or as its content needs, and never narrower than MinWidth: laid out at
@@ -87,12 +106,13 @@ namespace kui
                     _children[i]->Layout(BoxConstraints { width, width, 0.f, kui::Infinity });
                     _children[i]->SetOffset(node.position);
                 }
+                Settle();
             }
 
             // ---- where things are -----------------------------------------------------------------------
 
-            [[nodiscard]] kor::Vec2 ToGraph(const kor::Vec2 view) const { return (view - _pan) / _zoom; }
-            [[nodiscard]] kor::Vec2 ToView(const kor::Vec2 graph) const { return graph * _zoom + _pan; }
+            [[nodiscard]] kor::Vec2 ToGraph(const kor::Vec2 view) const { return (view - Pan()) / _view->zoom; }
+            [[nodiscard]] kor::Vec2 ToView(const kor::Vec2 graph) const { return graph * _view->zoom + Pan(); }
 
             [[nodiscard]] kor::Vec2 ChildOrigin(const RenderObject& child) const override { return ToView(child.Offset() + ShiftOf(child)); }
             [[nodiscard]] kor::Vec2 MapToChild(const RenderObject& child, const kor::Vec2 point) const override
@@ -121,20 +141,21 @@ namespace kui
             {
                 const Theme& t = Theme::Current();
                 const Rect bounds = Rect::FromSize(Size()).Shift(offset);
+                _view->origin = ToGlobal({});
                 canvas.Save();
                 canvas.ClipRect(bounds);
                 canvas.DrawRect(bounds, Paint::Fill(t.background));
                 PaintGrid(canvas, offset, t);
 
                 canvas.Save();
-                canvas.Translate(offset + _pan);
-                canvas.Scale(_zoom);
-                const float pixel = 1.f / _zoom;
+                canvas.Translate(offset + Pan());
+                canvas.Scale(_view->zoom);
+                const float pixel = 1.f / _view->zoom;
                 // What is in view, in the graph: what lies wholly outside it is not drawn at all.
                 const Rect seen = Rect::LTRB(ToGraph({}).x, ToGraph({}).y, ToGraph(Size()).x, ToGraph(Size()).y).Inflate(20.f);
 
                 for (const auto& comment : _config.graph.comments)
-                    if (!comment.rect.Intersect(seen).Empty()) PaintComment(canvas, comment, t, pixel);
+                    if (!CommentRect(comment).Intersect(seen).Empty()) PaintComment(canvas, comment, t, pixel);
                 for (const auto& wire : _config.graph.wires) PaintWire(canvas, wire, t, pixel, seen);
                 for (std::size_t i = 0; i < _children.size() && i < _config.graph.nodes.size(); ++i) {
                     const auto& node = _config.graph.nodes[i];
@@ -166,12 +187,13 @@ namespace kui
             {
                 using Type = PointerEvent::Type;
                 const kor::Vec2 graph = ToGraph(event.local);
+                _view->origin = event.position - event.local;
                 switch (event.type) {
                 case Type::eScroll: {
                     // Zoomed about the pointer: what is under it stays under it.
-                    const float zoom = std::clamp(_zoom * std::pow(1.15f, event.delta.y), MinZoom, MaxZoom);
-                    _pan = event.local - graph * zoom;
-                    _zoom = zoom;
+                    const float zoom = std::clamp(_view->zoom * std::pow(1.15f, event.delta.y), MinZoom, MaxZoom);
+                    _view->zoom = zoom;
+                    _view->centre = graph - (event.local - Size() * 0.5f) / zoom;
                     MarkNeedsPaint();
                     return true;
                 }
@@ -249,7 +271,7 @@ namespace kui
                     o.onDuplicate({ _pickedNodes.begin(), _pickedNodes.end() });
                     return true;
                 case kor::Key::eF:
-                    Frame();
+                    Frame(!_pickedNodes.empty());
                     return true;
                 default:
                     return false;
@@ -258,10 +280,83 @@ namespace kui
 
             // ---- for tests, and the view's own use --------------------------------------------------------
 
-            [[nodiscard]] float Zoom() const { return _zoom; }
-            [[nodiscard]] kor::Vec2 Pan() const { return _pan; }
+            [[nodiscard]] float Zoom() const { return _view->zoom; }
+            /** Where the graph's origin is, in its own coordinates. */
+            [[nodiscard]] kor::Vec2 Pan() const { return Size() * 0.5f - _view->centre * _view->zoom; }
 
         private:
+            /** Lets go of the view: it is not this editor's to wake any longer. */
+            void Let()
+            {
+                if (_view && _view->kept.editor == this) {
+                    _view->kept.editor = nullptr;
+                    _view->kept.wake = nullptr;
+                }
+            }
+
+            /** Shows @p page: where the one shown was left is kept, and this one is looked at where it was — or framed whole. */
+            void TurnTo(const std::string& page)
+            {
+                auto& kept = _view->kept;
+                if (kept.showing && *kept.showing == page) return;
+                if (kept.showing) kept.pages[*kept.showing] = { _view->centre, _view->zoom };
+                kept.showing = page;
+                if (const auto it = kept.pages.find(page); it != kept.pages.end()) std::tie(_view->centre, _view->zoom) = it->second;
+                else kept.frame = true;
+                _placed = true;
+            }
+
+            /** Once it is laid out: what the view asked of it, now that it is known where the nodes are. */
+            void Settle()
+            {
+                _view->size = Size();
+                if (Size().x <= 0.f || Size().y <= 0.f) return;     // not seen yet: what was asked waits
+                if (!_placed) {
+                    // Its own view starts with the graph's origin at its top-left; the caller's is where the caller has it.
+                    if (_own) _view->centre = Size() * 0.5f / _view->zoom;
+                    _placed = true;
+                }
+                auto& kept = _view->kept;
+                // A page with nothing on it yet is framed once something is.
+                if (kept.frame && !_config.graph.nodes.empty()) {
+                    kept.frame = false;
+                    Frame(false);
+                }
+                if (const std::string id = std::exchange(kept.reveal, std::string()); !id.empty()) {
+                    if (const GraphNode* node = FindNode(id)) {
+                        // Picked, as the caller has it already: nobody is told.
+                        _pickedNodes = { id };
+                        _pickedWires.clear();
+                        _pickedComments.clear();
+                        const Rect card = NodeRect(*node);
+                        const Rect seen = Rect::LTRB(ToGraph({}).x, ToGraph({}).y, ToGraph(Size()).x, ToGraph(Size()).y);
+                        if (card.Intersect(seen) != card) _view->centre = card.Center();
+                        MarkNeedsPaint();
+                    }
+                }
+            }
+
+            [[nodiscard]] const GraphNode* NodeAt(const kor::Vec2 graph) const
+            {
+                for (auto it = _config.graph.nodes.rbegin(); it != _config.graph.nodes.rend(); ++it)
+                    if (NodeRect(*it).Contains(graph)) return &*it;
+                return nullptr;
+            }
+
+            /** Where a comment is: its rectangle, or a frame round the nodes it is round. */
+            [[nodiscard]] Rect CommentRect(const GraphComment& comment) const
+            {
+                if (comment.around.empty()) return comment.rect;
+                std::optional<Rect> bounds;
+                for (const auto& id : comment.around)
+                    if (const GraphNode* node = FindNode(id)) bounds = bounds ? bounds->Union(NodeRect(*node)) : NodeRect(*node);
+                if (!bounds) return {};
+                // One that holds another is round it: further out by its title, and a margin, for each it holds.
+                const float pad = FramePad + static_cast<float>(std::max(comment.depth, 0)) * (FramePad * 0.75f);
+                const float top = pad - FramePad + FramePad * 0.5f + static_cast<float>(std::max(comment.depth, 0)) * CommentTitle;
+                return Rect::LTRB(bounds->left - pad, bounds->top - CommentTitle - top, bounds->right + pad, bounds->bottom + pad);
+            }
+
             enum class Drag : std::uint8_t { eNone, ePan, eNodes, eBox, eWire, eComment, eCommentResize };
 
             [[nodiscard]] const GraphNode* FindNode(const std::string_view id) const
@@ -303,7 +398,7 @@ namespace kui
 
             [[nodiscard]] std::optional<PortHit> HoveredPort(const kor::Vec2 graph) const
             {
-                const float reach = (PortRadius + 4.f) / std::min(_zoom, 1.f);
+                const float reach = (PortRadius + 4.f) / std::min(_view->zoom, 1.f);
                 for (auto it = _config.graph.nodes.rbegin(); it != _config.graph.nodes.rend(); ++it) {
                     const Rect card = NodeRect(*it);
                     for (const bool output : { false, true }) {
@@ -393,6 +488,7 @@ namespace kui
                     if (!NodeRect(*it).Contains(graph)) continue;
                     if (add) Pick({ it->id }, true);
                     else if (!_pickedNodes.contains(it->id)) Pick({ it->id }, false);
+                    _pressedNode = it->id;
                     _carried = _pickedNodes;
                     _carriedComments.clear();
                     _dragFrom = graph;
@@ -401,7 +497,7 @@ namespace kui
                 }
 
                 // A wire, picked by clicking near it.
-                const float near = 6.f / _zoom;
+                const float near = 6.f / _view->zoom;
                 for (const auto& wire : _config.graph.wires) {
                     const auto from = PortPosition(wire.from, true), to = PortPosition(wire.to, false);
                     if (!from || !to) continue;
@@ -414,9 +510,9 @@ namespace kui
 
                 // A comment: its corner resizes it, its title moves it and what it holds.
                 for (auto it = _config.graph.comments.rbegin(); it != _config.graph.comments.rend(); ++it) {
-                    const Rect& r = it->rect;
+                    const Rect r = CommentRect(*it);
                     if (!r.Contains(graph)) continue;
-                    const bool corner = graph.x > r.right - CommentCorner / _zoom && graph.y > r.bottom - CommentCorner / _zoom;
+                    const bool corner = it->around.empty() && graph.x > r.right - CommentCorner / _view->zoom && graph.y > r.bottom - CommentCorner / _view->zoom;
                     const bool title = graph.y < r.top + CommentTitle;
                     if (!corner && !title) break;   // its inside is the canvas: a box is drawn there
                     Pick({}, add, {}, { it->id });
@@ -428,8 +524,11 @@ namespace kui
                     } else {
                         _drag = Drag::eComment;
                         _carried.clear();
+                        _commentAround = !it->around.empty();
+                        // A frame carries what it is round; a rectangle, what is wholly inside it.
                         for (const auto& node : _config.graph.nodes)
-                            if (r.Contains(NodeRect(node).TopLeft()) && r.Contains(kor::Vec2(NodeRect(node).right, NodeRect(node).bottom) - kor::Vec2(1.f)))
+                            if (_commentAround ? std::ranges::contains(it->around, node.id)
+                                               : r.Contains(NodeRect(node).TopLeft()) && r.Contains(kor::Vec2(NodeRect(node).right, NodeRect(node).bottom) - kor::Vec2(1.f)))
                                 _carried.insert(node.id);
                     }
                     return;
@@ -445,7 +544,7 @@ namespace kui
             {
                 switch (_drag) {
                 case Drag::ePan:
-                    _pan += event.delta;
+                    _view->centre -= event.delta / _view->zoom;
                     break;
                 case Drag::eNodes:
                 case Drag::eComment:
@@ -472,14 +571,28 @@ namespace kui
                 const Drag drag = std::exchange(_drag, Drag::eNone);
                 switch (drag) {
                 case Drag::ePan:
-                    if (!_moved && event.button == kor::MouseButton::eRight && o.onContextMenu) o.onContextMenu(graph, event.local);
+                    if (!_moved && event.button == kor::MouseButton::eRight) OpenMenu(event, graph);
                     break;
                 case Drag::eNodes:
                     if (_moved && o.onMove && _dragBy != kor::Vec2(0.f)) o.onMove({ _carried.begin(), _carried.end() }, _dragBy);
+                    if (!_moved && o.onActivate && !_pressedNode.empty()) {
+                        // The second press of a node soon after the first: pressed twice.
+                        const auto now = std::chrono::steady_clock::now();
+                        if (_tapped == _pressedNode && now - _tappedAt < Twice) {
+                            _tapped.clear();
+                            const std::string node = _pressedNode;
+                            _dragBy = {};
+                            _carried.clear();
+                            o.onActivate(node);
+                            return;
+                        }
+                        _tapped = _pressedNode;
+                        _tappedAt = now;
+                    }
                     break;
                 case Drag::eComment:
                     if (_moved && _dragBy != kor::Vec2(0.f)) {
-                        if (o.onCommentChanged) o.onCommentChanged(_comment, _commentRect.Shift(_dragBy));
+                        if (o.onCommentChanged && !_commentAround) o.onCommentChanged(_comment, _commentRect.Shift(_dragBy));
                         if (o.onMove && !_carried.empty()) o.onMove({ _carried.begin(), _carried.end() }, _dragBy);
                     }
                     break;
@@ -512,6 +625,23 @@ namespace kui
                 _dragBy = {};
                 _carried.clear();
                 MarkNeedsPaint();
+            }
+
+            /** The right button let go where it was pressed: the caller's menu, for the node under it or for nothing. */
+            void OpenMenu(const PointerEvent& event, const kor::Vec2 graph)
+            {
+                const auto& o = _config.options;
+                std::vector<MenuItem> items;
+                if (o.menu) {
+                    const GraphNode* under = NodeAt(graph);
+                    if (under && !_pickedNodes.contains(under->id)) Pick({ under->id }, false);
+                    items = under ? o.menu({ _pickedNodes.begin(), _pickedNodes.end() }, graph) : o.menu({}, graph);
+                }
+                if (!items.empty()) {
+                    if (Owner* owner = GetOwner()) detail::ShowMenu(*owner, items, event.position);
+                } else if (o.onContextMenu) {
+                    o.onContextMenu(graph, event.local);
+                }
             }
 
             void Connect(const kor::Vec2 graph)
@@ -550,17 +680,18 @@ namespace kui
                                   std::max(_commentRect.bottom + _dragBy.y, _commentRect.top + CommentTitle + 20.f));
             }
 
-            void Frame()
+            /** Brings into view, as near as fits, what is picked (@p picked) or everything. */
+            void Frame(const bool picked)
             {
                 std::optional<Rect> bounds;
                 for (const auto& node : _config.graph.nodes) {
-                    if (!_pickedNodes.empty() && !_pickedNodes.contains(node.id)) continue;
+                    if (picked && !_pickedNodes.contains(node.id)) continue;
                     bounds = bounds ? bounds->Union(NodeRect(node)) : NodeRect(node);
                 }
                 if (!bounds || Size().x <= 0.f || Size().y <= 0.f) return;
                 const Rect b = bounds->Inflate(40.f);
-                _zoom = std::clamp(std::min(Size().x / b.Width(), Size().y / b.Height()), MinZoom, 1.f);
-                _pan = Size() * 0.5f - b.Center() * _zoom;
+                _view->zoom = std::clamp(std::min(Size().x / b.Width(), Size().y / b.Height()), MinZoom, 1.f);
+                _view->centre = b.Center();
                 MarkNeedsPaint();
             }
 
@@ -570,11 +701,12 @@ namespace kui
             {
                 const float grid = _config.options.gridSize;
                 if (grid <= 0.f) return;
-                const float step = grid * _zoom;
+                const float step = grid * _view->zoom;
                 const Color minor = t.border.WithAlpha(0.35f), major = t.border.WithAlpha(0.9f);
                 const auto lines = [&](const float spacing, const Color color) {
                     if (spacing < 6.f) return;   // too dense to read
-                    const kor::Vec2 start = { std::fmod(_pan.x, spacing), std::fmod(_pan.y, spacing) };
+                    const kor::Vec2 pan = Pan();
+                    const kor::Vec2 start = { std::fmod(pan.x, spacing), std::fmod(pan.y, spacing) };
                     for (float x = start.x < 0.f ? start.x + spacing : start.x; x < Size().x; x += spacing)
                         canvas.DrawLine(offset + kor::Vec2(x, 0.f), offset + kor::Vec2(x, Size().y), Paint::Stroked(color, 1.f));
                     for (float y = start.y < 0.f ? start.y + spacing : start.y; y < Size().y; y += spacing)
@@ -586,16 +718,27 @@ namespace kui
 
             void PaintComment(Canvas& canvas, const GraphComment& comment, const Theme& t, const float pixel) const
             {
-                Rect r = comment.rect;
-                if (_drag == Drag::eComment && _comment == comment.id) r = r.Shift(_dragBy);
+                // A frame round nodes goes where they are drawn, dragged or not.
+                Rect r = CommentRect(comment);
+                if (_drag == Drag::eComment && _comment == comment.id && comment.around.empty()) r = r.Shift(_dragBy);
                 if (_drag == Drag::eCommentResize && _comment == comment.id) r = ResizedComment();
                 const Color color = Resolve(comment.color, t.primary);
+                const bool picked = _pickedComments.contains(comment.id);
+                if (comment.container) {
+                    // A node of nodes: its body under them, its title bar in its colour, and its edge.
+                    canvas.DrawRRect({ r, 8.f }, Paint::Fill(t.surface.WithAlpha(0.72f)));
+                    canvas.DrawRRect({ r, 8.f }, Paint::Fill(color.WithAlpha(0.08f)));
+                    canvas.DrawRRect({ Rect::LTRB(r.left, r.top, r.right, r.top + CommentTitle), Radii { 8.f, 8.f, 0.f, 0.f } }, Paint::Fill(color.WithAlpha(0.85f)));
+                    canvas.DrawText(comment.text, { r.left + 10.f, r.top + 5.f }, { .size = 14.f, .color = t.text });
+                    canvas.DrawRRect({ r, 8.f }, Paint::Stroked(picked ? t.primary : color.WithAlpha(0.9f), (picked ? 2.5f : 1.5f) * pixel));
+                    return;
+                }
                 canvas.DrawRRect({ r, 8.f }, Paint::Fill(color.WithAlpha(0.03f)));
                 canvas.DrawRRect({ Rect::LTRB(r.left, r.top, r.right, r.top + CommentTitle), Radii { 8.f, 8.f, 0.f, 0.f } }, Paint::Fill(color.WithAlpha(0.22f)));
                 canvas.DrawText(comment.text, { r.left + 10.f, r.top + 4.f }, { .size = 14.f, .color = t.text });
-                const bool picked = _pickedComments.contains(comment.id);
                 canvas.DrawRRect({ r, 8.f }, Paint::Stroked(picked ? t.primary : color.WithAlpha(0.5f), (picked ? 2.f : 1.f) * pixel));
                 // The corner that resizes it.
+                if (!comment.around.empty()) return;
                 const kor::Vec2 c { r.right - 4.f, r.bottom - 4.f };
                 canvas.DrawLine(c - kor::Vec2(8.f, 0.f), c - kor::Vec2(0.f, 8.f), Paint::Stroked(color.WithAlpha(0.7f), 1.5f * pixel));
             }
@@ -652,8 +795,9 @@ namespace kui
             }
 
             Config _config;
-            kor::Vec2 _pan { 0.f, 0.f };
-            float _zoom = 1.f;
+            std::shared_ptr<NodeEditorView> _view = std::make_shared<NodeEditorView>();
+            bool _own = true;            // the view is its own, not the caller's: it is not kept a page at a time
+            bool _placed = false;        // the view has been put where it starts
             std::set<std::string> _pickedNodes, _pickedComments;
             std::set<GraphWire> _pickedWires;
 
@@ -671,6 +815,9 @@ namespace kui
             std::optional<GraphWire> _pickedUp;
             std::string _comment;
             Rect _commentRect {};
+            bool _commentAround = false;  // the comment dragged is a frame round nodes
+            std::string _pressedNode, _tapped;
+            std::chrono::steady_clock::time_point _tappedAt {};
         };
 
         struct NodeCanvasWidget final : RenderObjectWidget {
@@ -696,16 +843,33 @@ namespace kui
             std::vector<Widget> rows;
             rows.push_back(Container({ .height = TitleHeight, .padding = EdgeInsets::Symmetric(10.f, 0.f),
                                        .decoration = { .color = Resolve(node.accent, t.surfaceHover), .radius = Radii { 6.f, 6.f, 0.f, 0.f } } },
-                                     Align(Alignment::CenterLeft(), Text(node.title, title, TextAlign::eStart, false))));
+                                     Align(Alignment::CenterLeft(), [&]() -> Widget {
+                                         Widget text = Text(node.title, title, TextAlign::eStart, false);
+                                         const auto icon = node.icon.empty() ? nullptr : MaterialIcon(node.icon);
+                                         if (!icon) return text;
+                                         return Row({ SizedBox(15.f, 15.f, Icon(icon, title.color.a < 0.f ? t.text : title.color)), std::move(text) }, FlexOptions { .gap = 6.f });
+                                     }())));
             const std::size_t count = std::max(node.inputs.size(), node.outputs.size());
+            if (count > 0) rows.push_back(SizedBox(0.f, PortsTop));
             for (std::size_t i = 0; i < count; ++i) {
-                Widget in = i < node.inputs.size() ? Text(node.inputs[i].label, label, TextAlign::eStart, false) : SizedBox(0.f, 0.f);
+                Widget in = SizedBox(0.f, 0.f);
+                if (i < node.inputs.size()) {
+                    const NodePort& port = node.inputs[i];
+                    in = Text(port.label, label, TextAlign::eStart, false);
+                    if (port.control) {
+                        in = Row({ std::move(in), port.control }, { .crossAxisAlignment = CrossAxisAlignment::eCenter, .gap = 8.f });
+                    } else if (!port.value.empty()) {
+                        TextStyle given = label;
+                        given.color = t.textMuted.WithAlpha(0.65f);
+                        in = Row({ std::move(in), Text(port.value, given, TextAlign::eStart, false) }, { .crossAxisAlignment = CrossAxisAlignment::eCenter, .gap = 6.f });
+                    }
+                }
                 Widget out = i < node.outputs.size() ? Text(node.outputs[i].label, label, TextAlign::eEnd, false) : SizedBox(0.f, 0.f);
-                rows.push_back(Container({ .height = RowHeight, .padding = EdgeInsets::Symmetric(12.f, 0.f) },
-                                         Row({ std::move(in), SizedBox(16.f, 0.f).Expanded(), std::move(out) },
+                rows.push_back(Container({ .height = RowHeight, .padding = EdgeInsets::Symmetric(14.f, 0.f) },
+                                         Row({ std::move(in), SizedBox(20.f, 0.f).Expanded(), std::move(out) },
                                              { .crossAxisAlignment = CrossAxisAlignment::eCenter })));
             }
-            if (node.body) rows.push_back(node.body.Padding(EdgeInsets::All(8.f)));
+            if (node.body) rows.push_back(node.body.Padding(EdgeInsets { 12.f, count > 0 ? 4.f : 10.f, 12.f, 12.f }));
             if (!node.error.empty()) {
                 TextStyle error = label;
                 error.color = ErrorColor;
@@ -716,6 +880,18 @@ namespace kui
                              Column(std::move(rows), { .crossAxisAlignment = CrossAxisAlignment::eStretch, .mainAxisSize = MainAxisSize::eMin }))
                 .Key(node.id);
         }
+    }
+
+    void NodeEditorView::Frame()
+    {
+        kept.frame = true;
+        if (kept.wake) kept.wake();
+    }
+
+    void NodeEditorView::Reveal(std::string id)
+    {
+        kept.reveal = std::move(id);
+        if (kept.wake) kept.wake();
     }
 
     Widget NodeEditor(NodeGraph graph, NodeEditorOptions options)

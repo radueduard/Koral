@@ -144,6 +144,8 @@ internal object AutoLayouts {
                 else GpuLayout<Mat3>(48, { s, at, m -> for (c in 0 until 3) m[c].toArray().forEachIndexed { r, f -> s.set(F, at + c * 16L + r * 4L, f) } },
                                      { s, at -> Mat3(FloatArray(9) { s.get(F, at + (it / 3) * 16L + (it % 3) * 4L) }) }, 16)
             else -> when {
+                Resource::class.java.isAssignableFrom(type) ->
+                    throw IllegalArgumentException("${type.simpleName}: a resource has no bytes of its own. A push constant takes it (pushConstantBlock and pushConstant push the struct by its fields' names); in a buffer, store Bindless.sampled(...)/storage(...)/... instead")
                 type.isEnum -> enumLayout(type)
                 type.isArray || Collection::class.java.isAssignableFrom(type) ->
                     throw IllegalArgumentException("${type.simpleName}: an array or list inside a struct has no fixed size in GPU memory; use separate fields, or a buffer of its own")

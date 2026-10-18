@@ -7,10 +7,12 @@
 #include <filesystem>
 #include <string>
 #include <map>
+#include <set>
 #include <vector>
 
 #include <kmath/matrix.h>
 
+#include "bindless.h"
 #include "shader.h"
 
 namespace kor
@@ -35,6 +37,16 @@ namespace kor
         /// Keyed by location because the parameter's name is not what reaches the SPIR-V, and the
         /// module name is empty: a bare semantic names no vocabulary. @see vertexLayout.h
         std::map<kor::u32, FieldSemantic> varyingSemantics;
+
+        /// Push-constant path -> the table a `T.Handle` (DescriptorHandle<T>) there indexes. In the SPIR-V a
+        /// handle is only a uint2; its type survives in Slang's reflection alone. Paths are spelled as the
+        /// push constant is named: "push.output" for an entry point's `uniform Push push`, "output" for a
+        /// field of a push-constant block. An array of handles is one entry, under the array's name.
+        std::map<std::string, BindlessKind> pushHandles;
+
+        /// The entry point's parameters, by name: a `uniform Push push` reaches the push constants as a struct
+        /// member "push" that is the shader's way of passing values in, not a struct of the block's own.
+        std::set<std::string> entryParameters;
     };
 
     // Thin wrapper over the Slang in-process compiler. Compiles a single entry point of a

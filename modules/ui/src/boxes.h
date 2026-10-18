@@ -261,6 +261,8 @@ namespace kui
         Axis _axis = Axis::eVertical;
         float _scroll = 0.f;
         std::shared_ptr<Layer> _thumb;
+        bool _dragging = false;     // the thumb is held, _grabAt along it from its start
+        float _grabAt = 0.f;
     };
 
     class RenderIgnorePointer final : public RenderContainer {

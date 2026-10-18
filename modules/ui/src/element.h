@@ -161,6 +161,8 @@ namespace kui
          *        a Themed, or from another language, that is not where the widget ends up.
          */
         Widget Deferred(std::function<Widget()> build);
+        /** @brief Opens a menu of @p items with its top-left at @p at, in the view's coordinates, as a context menu does. */
+        void ShowMenu(Owner& owner, const std::vector<MenuItem>& items, kor::Vec2 at);
     }
 
     struct ThemeScope {

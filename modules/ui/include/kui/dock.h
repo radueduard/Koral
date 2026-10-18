@@ -22,9 +22,11 @@ namespace kui
      *
      * Down each side an area that can be in several parts, one over the other; along the bottom, from
      * one side to the other and under both, an area in two parts, left and right; and the middle,
-     * which is whatever is left — the scene, where nothing is docked in it.
+     * which is whatever is left — the scene, where nothing is docked in it. The middle can be in as
+     * many parts side by side as there are panels, each its own tabs: eCenter's part says which (from
+     * the left), and eCenterRight is a part of its own to the right of them all.
      */
-    enum class DockArea : std::uint8_t { eLeft, eRight, eBottomLeft, eBottomRight, eCenter };
+    enum class DockArea : std::uint8_t { eLeft, eRight, eBottomLeft, eBottomRight, eCenter, eCenterRight };
 
     /** @brief A side of a panel or of the space, for DockLayout::Dock(panel, side, relativeTo, fraction). */
     enum class DockSide : std::uint8_t { eLeft, eRight, eTop, eBottom, eCenter };
@@ -75,9 +77,10 @@ namespace kui
 
         /**
          * @brief Docks @p panel in @p area, and opens it there — in front of whatever of that area was
-         *        open. Down a side, @p part says which part of it, counted from the top; a part that is
-         *        not there yet is made. A panel the layout has not placed yet goes there when the dock
-         *        space first shows it; one already placed moves now.
+         *        open. Down a side, @p part says which part of it, counted from the top; in the middle,
+         *        which part from the left. A part that is not there yet is made — in the middle, among the
+         *        others in the order of the parts they were made as. A panel the layout has not placed yet
+         *        goes there when the dock space first shows it; one already placed moves now.
          */
         DockLayout& Dock(std::string panel, DockArea area, int part = 0);
         /**
@@ -108,7 +111,10 @@ namespace kui
         void Close(const std::string& panel);
         void Open(const std::string& panel);
         [[nodiscard]] bool IsOpen(const std::string& panel) const;
-        /** @brief Shows @p panel in its area, in front of whatever of that area was shown. */
+        /**
+         * @brief Shows @p panel in its area, in front of whatever of that area was shown. A panel not placed yet is
+         *        shown when it is, and stays in front of the panels of its group placed after it.
+         */
         void Activate(const std::string& panel);
         /** @brief Folds @p panel 's area away, when it is the one shown there: its button stays in the stripe. */
         void Hide(const std::string& panel);
@@ -193,7 +199,10 @@ namespace kui
      *  - The middle is whatever the sides and the bottom leave. With nothing docked in it it is empty:
      *    it shows what is behind the space, the scene, and lets the pointer through. Panels docked
      *    there (DockArea::eCenter, or dragged into it) are tabs, with no buttons in the stripes: one is
-     *    brought to the front by its title, and taken out by dragging its title away.
+     *    brought to the front by its title, and taken out by dragging its title away. The middle can be
+     *    in any number of parts, side by side with a line between each two to drag (the part of
+     *    DockArea::eCenter says which); a part that loses its last panel is gone, and the others share
+     *    its room.
      *
      * An open panel has a title bar along its top: its title on the left; on the right a button that
      * folds it away and, when it is closable, one that closes it; between them, whatever the panel's
@@ -211,8 +220,9 @@ namespace kui
      *    stripes — into the area on that side. A side's margin is in bands, one for each of the side's
      *    levels and one more: over a level's band the panel joins that level, over the last it is a
      *    level of its own under them all. The bottom's margin is its two parts, left and right;
-     *  - into the middle — onto its title bar, or within the 30% about its centre — to dock it there, a
-     *    tab among whatever else is in the middle;
+     *  - into the middle — onto a part's title bar, or within the 30% about its centre — to dock it
+     *    there, a tab among whatever else is in that part; or over a part's left or right edge (15% of
+     *    its width), to make it a part of its own on that side of it;
      *  - anywhere else in the space, to float there; and out of the window, to float over the desktop.
      *
      * A float is moved by its title bar, in the window and out of it alike, and its bar ends in a

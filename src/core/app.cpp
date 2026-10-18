@@ -860,10 +860,18 @@ namespace kor
             input.UpdateActions();
         }
 
-        // The frame's clock: one real delta, which each scene scales by its own time scale.
-        const auto now = Clock::now();
-        const float frameTime = impl.lastFrame ? std::chrono::duration<float>(now - *impl.lastFrame).count() : 0.f;
-        impl.lastFrame = now;
+        // The frame's clock: one real delta, which each scene scales by its own time scale. Read where the frame
+        // has finished waiting — for the GPU, and for an image to draw into — just before the scenes update: what a
+        // scene moves by is then the time since the last frame's moment. Read before the wait, it was the frame
+        // before's: a frame that waited long moved things by a short step, and the next one by a long step.
+        bool ticked = false;
+        const auto tick = [&impl, &ticked] {
+            ticked = true;
+            const auto now = Clock::now();
+            const float frameTime = impl.lastFrame ? std::chrono::duration<float>(now - *impl.lastFrame).count() : 0.f;
+            impl.lastFrame = now;
+            for (const auto& stage : impl.stages) stage->Top()._time.Advance(frameTime);
+        };
 
         // Offscreen windows first: a scene that shows one — an editor's viewport — then shows what
         // it drew this frame, not the last.
@@ -873,7 +881,6 @@ namespace kor
             for (const auto& stage : impl.stages) {
                 Window& window = *stage->window;
                 if (window.IsOffscreen() != offscreen) continue;
-                stage->Top()._time.Advance(frameTime);
                 window._shownThisFrame = false;   // until the scheduler gives it an image
                 if (window.IsPaused()) continue;
                 active.push_back(stage.get());
@@ -893,7 +900,8 @@ namespace kor
         }
 
         if (active.empty()) {
-            // Every window minimized: nothing to draw, and no reason to spin.
+            // Every window minimized: nothing to draw, and no reason to spin — but the clock goes on.
+            tick();
             for (const auto& stage : impl.stages) stage->Top()._input->Update();
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             return true;
@@ -915,6 +923,7 @@ namespace kor
 
         impl.inFrame = true;
         Context::Scheduler().Draw(windows, [&](CommandBuffer& commandBuffer) {
+            tick();
             Context::Repository().Update();
             for (Impl::Stage* stage : active) {
                 Window& window = *stage->window;
@@ -960,6 +969,7 @@ namespace kor
             }
         });
         impl.inFrame = false;
+        if (!ticked) tick();    // a scheduler that drew nothing this frame: the clock goes on all the same
 
         for (const auto& stage : impl.stages) {
             stage->Top()._input->Update();

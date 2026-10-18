@@ -322,6 +322,26 @@ public static partial class Cases
             var read = output.Read<uint>();
             Check.That(read.SequenceEqual([11u, 21u, 31u, 41u]), $"read through the index: [{string.Join(", ", read)}]");
 
+            // The buffer itself, pushed: its index is asked for on the way.
+            output.Write(new uint[] { 0, 0, 0, 0 });
+            CommandBuffer.SingleTimeCommand(cb => cb
+                .BindComputePipeline(pipeline)
+                .Bind("data", output)
+                .PushConstant("source", input)
+                .Dispatch(), CommandBuffer.Usage.eCompute).Wait();
+            read = output.Read<uint>();
+            Check.That(read.SequenceEqual([11u, 21u, 31u, 41u]), $"read through the pushed buffer: [{string.Join(", ", read)}]");
+
+            // A record holding the buffer, pushed field by field: its Source is the block's `source`.
+            output.Write(new uint[] { 0, 0, 0, 0 });
+            CommandBuffer.SingleTimeCommand(cb => cb
+                .BindComputePipeline(pipeline)
+                .Bind("data", output)
+                .PushConstants(new PushedBuffer(input))
+                .Dispatch(), CommandBuffer.Usage.eCompute).Wait();
+            read = output.Read<uint>();
+            Check.That(read.SequenceEqual([11u, 21u, 31u, 41u]), $"read through a pushed record's buffer: [{string.Join(", ", read)}]");
+
             var heap = new DescriptorHeap.Builder().SetSlotCount(2).Build();
             if (Context.ActiveDescriptorModel != DescriptorModel.eHeap)
             {
@@ -821,3 +841,6 @@ public static partial class Cases
         }
     }
 }
+
+/// <summary>What the bindless case pushes as a whole: its one field is the shader block's <c>source</c>.</summary>
+internal sealed record PushedBuffer(Koral.Buffer Source);

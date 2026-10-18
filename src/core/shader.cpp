@@ -385,6 +385,10 @@ namespace kor {
                 _fieldSemantics.emplace(field, FieldSemantic{ std::move(annotation.moduleName),
                                                               std::move(annotation.semantic) });
             }
+            _entryParameters = std::move(result.entryParameters);
+            _pushHandles.clear();                           // `T.Handle` push constants
+            for (const auto& [path, kind] : result.pushHandles)   // a handle to a kind with no table: PushConstantField::NoTable
+                _pushHandles.emplace(path, kind == BindlessKind::eNone ? PushConstantField::NoTable : static_cast<kor::u8>(kind));
             _inputSemantics.clear();                        // `: SEMANTIC` on the stage inputs
             for (auto& [location, annotation] : result.varyingSemantics) {
                 _inputSemantics.emplace(location, FieldSemantic{ std::move(annotation.moduleName),
@@ -690,15 +694,22 @@ namespace kor {
     	if (blockType.basetype != spirv_cross::SPIRType::Struct) return;
 
     	blockSize = static_cast<kor::u32>(module.get_declared_struct_size(blockType));
-    	members.reserve(blockType.member_types.size());
+    	FetchStructMembers(module, resource.base_type_id, members);
+    }
 
-    	for (kor::u32 i = 0; i < blockType.member_types.size(); ++i) {
-    		const auto& memberType = module.get_type(blockType.member_types[i]);
+    void Shader::FetchStructMembers(const spirv_cross::Compiler& module, const kor::u32 typeId, std::vector<BlockMember>& members) const
+    {
+    	const auto& structType = module.get_type(typeId);
+    	if (structType.basetype != spirv_cross::SPIRType::Struct) return;
+    	members.reserve(structType.member_types.size());
+
+    	for (kor::u32 i = 0; i < structType.member_types.size(); ++i) {
+    		const auto& memberType = module.get_type(structType.member_types[i]);
 
     		BlockMember member;
-    		member.name = module.get_member_name(resource.base_type_id, i);
-    		member.offset = module.type_struct_member_offset(blockType, i);
-    		member.size = static_cast<kor::u32>(module.get_declared_struct_member_size(blockType, i));
+    		member.name = module.get_member_name(typeId, i);
+    		member.offset = module.type_struct_member_offset(structType, i);
+    		member.size = static_cast<kor::u32>(module.get_declared_struct_member_size(structType, i));
     		member.rows = static_cast<kor::u8>(memberType.vecsize);
     		member.columns = static_cast<kor::u8>(memberType.columns);
 
@@ -721,6 +732,26 @@ namespace kor {
     	}
     }
 
+    // A StructuredBuffer<T> is a block of one member, an array of T with no size: T's own fields are
+    // what a writer of its elements wants, each where it is within one element.
+    void Shader::FetchElementMembers(const spirv_cross::Compiler& module,
+                                     const spirv_cross::Resource& resource,
+                                     std::vector<BlockMember>& members,
+                                     kor::u32& stride) const
+    {
+    	const auto& blockType = module.get_type(resource.base_type_id);
+    	if (blockType.basetype != spirv_cross::SPIRType::Struct || blockType.member_types.size() != 1) return;
+    	const auto& arrayType = module.get_type(blockType.member_types[0]);
+    	if (arrayType.array.empty()) return;
+    	// The element is the array's type with its array taken off: the struct's own id.
+    	kor::u32 element = blockType.member_types[0];
+    	while (module.get_type(element).basetype == spirv_cross::SPIRType::Struct && !module.get_type(element).array.empty())
+    		element = module.get_type(element).parent_type;
+    	if (module.get_type(element).basetype != spirv_cross::SPIRType::Struct) return;
+    	stride = module.type_struct_member_array_stride(blockType, 0);
+    	FetchStructMembers(module, module.get_type(element).self, members);
+    }
+
 
     namespace {
         // Whether a block's declared offsets and strides are the ones a packing standard
@@ -741,7 +772,7 @@ namespace kor {
     void Shader::FlattenPushConstant(const spirv_cross::Compiler& module,
                                      const spirv_cross::SPIRType& type,
                                      const std::string& prefix, const kor::u32 baseOffset,
-                                     std::vector<PushConstantField>& out)
+                                     std::vector<PushConstantField>& out) const
     {
     	if (type.basetype != spirv_cross::SPIRType::Struct) return;
 
@@ -766,6 +797,10 @@ namespace kor {
     		case spirv_cross::SPIRType::Double: field.scalar = 4; break;
     		default:                            field.scalar = 5; break;
     		}
+
+    		field.parameter = prefix.empty() && _entryParameters.contains(name);
+    		if (const auto handle = _pushHandles.find(name); handle != _pushHandles.end())
+    			field.handle = handle->second;   // its array elements copy it below
 
     		const bool isArray = !memberType.array.empty();
     		const bool isStruct = memberType.basetype == spirv_cross::SPIRType::Struct;
@@ -964,6 +999,11 @@ namespace kor {
 			auto descriptor = Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) };
 			descriptor.blockName = module.get_name(buffer.base_type_id);
 			FetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
+			FetchElementMembers(module, buffer, descriptor.elementMembers, descriptor.elementStride);
+			if (const auto it = _fieldSemantics.find(name); !name.empty() && it != _fieldSemantics.end()) {
+				descriptor.semanticNamespace = it->second.moduleName;
+				descriptor.semantic = it->second.semantic;
+			}
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eStorageBuffer
 		for (const auto& accelerationStructure : resources.acceleration_structures) {

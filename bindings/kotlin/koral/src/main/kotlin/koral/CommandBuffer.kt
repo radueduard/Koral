@@ -141,7 +141,13 @@ class CommandBuffer internal constructor(native: MemorySegment, private val owne
 
     /** PushConstantBlock: [data] (a primitive array or a MemorySegment) at byte [offset] of the push-constant block. */
     /** The push constant block's bytes from [offset]: anything Buffer.Builder.setData takes — a data class mirroring the block, typically. */
-    fun pushConstantBlock(data: Any, offset: Int = 0, packing: GpuPacking = GpuPacking.C) = apply {
+    fun pushConstantBlock(data: Any, offset: Int = 0, packing: GpuPacking = GpuPacking.C): CommandBuffer = apply {
+        // A resource has no bytes to lay out: a class holding one is pushed by its fields' names instead, which also
+        // puts every other field where the shader has it, whatever the packing.
+        if (holdsResource(data)) {
+            require(offset == 0) { "${data.javaClass.simpleName} holds a resource, so it is pushed by its fields' names: an offset means nothing for it" }
+            return@apply pushFields("", data)
+        }
         Arena.ofConfined().use { a ->
             val s = segmentOf(a, data, packing)
             KoralNative.koral_cmd_push_constant_block(n, s, s.byteSize().toInt(), offset)
@@ -150,19 +156,58 @@ class CommandBuffer internal constructor(native: MemorySegment, private val owne
 
     /**
      * PushConstant(name, value): the push constant the shaders call [name] — a Float, Int, UInt (`7u`), Vec2/3/4,
-     * IVec, UVec or Mat4, or an array of floats, ints or uints — checked against the shader's type, as in C++.
+     * IVec, UVec or Mat4, or an array of floats, ints or uints — checked against the shader's type, as in C++. An
+     * Image, ImageView, Buffer, Sampler or AccelerationStructure goes in as its bindless index (no
+     * [Bindless] call needed); a [DescriptorIndex] as itself. A class of such fields — a data class mirroring the
+     * shader's struct — is pushed field by field, as "[name].field": see [pushConstants].
      */
-    fun pushConstant(name: String, value: Any) = apply {
+    fun pushConstant(name: String, value: Any): CommandBuffer = apply {
         if (value is DescriptorIndex) {
             // A bindless index: into the uint the shader calls [name], and its resource into what follows' uses.
             Arena.ofConfined().use { a -> KoralNative.koral_cmd_push_index(n, name, value.native(a)) }
             return@apply
         }
-        Arena.ofConfined().use { a ->
-            val (bytes, shape) = ValueShape.encode(a, value)
-            KoralNative.koral_cmd_push_constant(n, name, bytes, bytes.byteSize().toInt(), shape.native(a))
+        if (value is Resource) {
+            // An image, image view, buffer, sampler or acceleration structure: its bindless index, asked for on the
+            // way — which table from its usage, or from which tables the bound pipeline reads.
+            KoralNative.koral_cmd_push_resource(n, name, value.native)
+            return@apply
+        }
+        val pushed = Arena.ofConfined().use { a ->
+            val encoded = ValueShape.encodeOrNull(a, value) ?: return@use false
+            KoralNative.koral_cmd_push_constant(n, name, encoded.first, encoded.first.byteSize().toInt(), encoded.second.native(a))
+            true
+        }
+        if (pushed) return@apply
+        // A class of fields: each pushed by its own name, under this one.
+        if (!isStruct(value)) Arena.ofConfined().use { ValueShape.encode(it, value) }   // throws, naming what a push constant can be
+        pushFields("$name.", value)
+    }
+
+    /**
+     * Every field of [value] — a data class, or any class of fields — pushed by its own name, as the fields of a
+     * push-constant block are named: `[[vk::push_constant]] cbuffer Push { ... }` or a `ConstantBuffer<Push>` one.
+     * For an entry point's `uniform Push push` parameter, push the struct by name instead: `pushConstant("push", value)`.
+     *
+     * Field by field, so the class needs no padding to match the shader's, and a field can be anything
+     * [pushConstant] takes: an Image, Buffer or other resource (its bindless index), a DescriptorIndex, a number, a
+     * vector, or another such class. A field left null is not pushed.
+     */
+    fun pushConstants(value: Any) = apply { pushFields("", value) }
+
+    private fun pushFields(prefix: String, value: Any) {
+        for (field in instanceFields(value.javaClass)) {
+            val v = field.get(value) ?: continue
+            val name = prefix + field.name
+            // A Kotlin UInt field is an int on the JVM, indistinguishable from an Int: written as its 4 bytes, so the
+            // shader's int or uint takes it alike (the size is still checked).
+            if (v is Int) Arena.ofConfined().use { a ->
+                val bytes = a.allocateFrom(ValueLayout.JAVA_INT, v)
+                KoralNative.koral_cmd_push_constant(n, name, bytes, 4, ValueShape(ValueScalar.eOther, known = false).native(a))
+            } else pushConstant(name, v)
         }
     }
+
 
     // ---- by name, bindless and the descriptor heap ----------------------------------------------------------
 
@@ -329,6 +374,24 @@ internal object CommandCallbacks {
     }
 }
 
+/** A class of fields a struct push walks: not a number, vector, array, collection or JDK/Kotlin type. */
+private fun isStruct(value: Any): Boolean {
+    val type = value.javaClass
+    if (type.isArray || type.isPrimitive || type.isEnum || value is Iterable<*> || value is MemorySegment) return false
+    val pkg = type.packageName
+    if (pkg.startsWith("java.") || pkg.startsWith("kotlin")) return false
+    return instanceFields(type).isNotEmpty()
+}
+
+/** Whether [value] is a class of fields with a resource somewhere among them. */
+private fun holdsResource(value: Any): Boolean = isStruct(value) && instanceFields(value.javaClass).any { f ->
+    when (val v = f.get(value)) { null -> false; is Resource -> true; else -> holdsResource(v) }
+}
+
+private fun instanceFields(type: Class<*>): List<java.lang.reflect.Field> =
+    type.declaredFields.filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) && !it.isSynthetic }
+        .onEach { it.isAccessible = true }
+
 data class TimerResult(val label: String, val milliseconds: Double, val depth: Int)
 
 /** kor::ValueShape: what a push constant's value is — checked against the shader's declaration. */
@@ -337,7 +400,10 @@ data class ValueShape(val scalar: ValueScalar, val rows: Int = 1, val columns: I
         .int("scalar", scalar.value).int("rows", rows).int("columns", columns).int("count", count).bool("known", known).segment
 
     internal companion object {
-        fun encode(a: Arena, value: Any): Pair<MemorySegment, ValueShape> {
+        fun encode(a: Arena, value: Any): Pair<MemorySegment, ValueShape> = encodeOrNull(a, value)
+            ?: throw IllegalArgumentException("${value.javaClass.simpleName} cannot be a push constant: give a number, a vector, a Mat4, an array, a resource, a DescriptorIndex, or a class of those")
+
+        fun encodeOrNull(a: Arena, value: Any): Pair<MemorySegment, ValueShape>? {
             fun floats(vararg f: Float) = a.allocateFrom(ValueLayout.JAVA_FLOAT, *f)
             fun ints(vararg i: Int) = a.allocateFrom(ValueLayout.JAVA_INT, *i)
             return when (value) {
@@ -359,7 +425,7 @@ data class ValueShape(val scalar: ValueScalar, val rows: Int = 1, val columns: I
                 is IntArray -> ints(*value) to ValueShape(ValueScalar.eInt, count = value.size)
                 is UIntArray -> ints(*value.toIntArray()) to ValueShape(ValueScalar.eUInt, count = value.size)
                 is MemorySegment -> value to ValueShape(ValueScalar.eOther, known = false)
-                else -> throw IllegalArgumentException("${value.javaClass.simpleName} cannot be a push constant: give a number, a vector, a Mat4 or an array")
+                else -> null
             }
         }
     }
