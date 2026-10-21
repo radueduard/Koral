@@ -190,6 +190,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             // We only filter the ones that were in the vector BEFORE the GLFW extensions were added
             std::vector<const char*> optionalToCheck = {
                 VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
+                // Both or neither: what lets a present say when it has let go of its semaphore. @see SwapChain::ClaimAcquiredImage
+                VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+                VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
             };
             if (hasValidation) {
                 optionalToCheck.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -207,6 +210,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 }
             }
         }
+
+        const auto enabled = [&](const std::string_view name) {
+            return std::ranges::any_of(_instanceExtensions, [&](const char* e) { return name == e; });
+        };
+        _surfaceMaintenance = enabled(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME) && enabled(VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
 
         kor::log::Info("[vulkan] Final instance extensions ({}):", _instanceExtensions.size());
         for (const auto& ext : _instanceExtensions)

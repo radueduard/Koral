@@ -181,8 +181,8 @@ namespace kor::vk
             shown.push_back({window->_surface, &swapChain});
         }
 
-        // Before the fence is reset, and so before anything is queued against these images: an image
-        // just acquired may still be owned by an older frame whose submit has not finished.
+        // Before the fence is reset, and so before anything is queued against these images: the
+        // semaphore each image's present waits for, which an older frame's present may still hold.
         for (const auto& s : shown) s.swapChain->ClaimAcquiredImage(fence);
 
         if (const auto result = Context::Device()->resetFences(1, &fence); result != ::vk::Result::eSuccess) {
@@ -447,11 +447,17 @@ namespace kor::vk
                 indices.push_back(shown[i].swapChain->currentImageIndex());
             }
             std::vector<::vk::Result> results(group.size(), ::vk::Result::eSuccess);
-            const auto presentInfo = ::vk::PresentInfoKHR()
+            auto presentInfo = ::vk::PresentInfoKHR()
                 .setWaitSemaphores(waits)
                 .setSwapchains(swapChains)
                 .setImageIndices(indices)
                 .setResults(results);
+            // What hands each semaphore back for another frame to signal. @see SwapChain::ClaimAcquiredImage
+            std::vector<::vk::Fence> presentFences;
+            if (Context::Device().supportsPresentFences())
+                for (const auto i : group) presentFences.push_back(shown[i].swapChain->PresentFence());
+            const auto fenceInfo = ::vk::SwapchainPresentFenceInfoKHR().setFences(presentFences);
+            if (!presentFences.empty()) presentInfo.setPNext(&fenceInfo);
             try {
                 const auto lock = Context::Device().lockQueues();
                 (void)queue->presentKHR(presentInfo);

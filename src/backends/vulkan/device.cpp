@@ -340,6 +340,17 @@ namespace kor::vk {
             chainIn(descriptorHeapFeatures);
             chainIn(maintenance5Features);
         }
+        // Fences a present signals once it is done with what it waited for: what lets a frame reuse a
+        // window's image without waiting for the frame that drew into it last. @see SwapChain::ClaimAcquiredImage
+        ::vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR supportedSwapchainMaintenance;
+        if (Context::Runtime().hasSurfaceMaintenance() && physicalDevice.supportsExtension(VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)) {
+            ::vk::PhysicalDeviceFeatures2 query;
+            query.pNext = &supportedSwapchainMaintenance;
+            physicalDevice->getFeatures2(&query);
+        }
+        _supportsPresentFences = supportedSwapchainMaintenance.swapchainMaintenance1;
+        auto swapchainMaintenanceFeatures = ::vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR().setSwapchainMaintenance1(true);
+        if (_supportsPresentFences) chainIn(swapchainMaintenanceFeatures);
         _enabledFeatures = enabled;
         detail::SetDeviceFeatures(available, enabled);
 
@@ -380,6 +391,7 @@ namespace kor::vk {
             }
         }
         if (fifoLatestReady) deviceExtensions.push_back(fifoLatestReady);
+        if (_supportsPresentFences) deviceExtensions.push_back(VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
         if (_enabledFeatures & (Feature::eAtomicFloat32 | Feature::eAtomicFloat64)) deviceExtensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
         if (_enabledFeatures & Feature::eCooperativeMatrix) deviceExtensions.push_back(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
         if (_enabledFeatures & Feature::eDescriptorHeap) {

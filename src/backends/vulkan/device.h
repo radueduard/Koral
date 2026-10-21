@@ -142,6 +142,8 @@ namespace kor::vk {
         [[nodiscard]] bool supportsRayTracing() const { return _supportsRayTracing; }
         /** Whether a swap chain may ask for ::vk::PresentModeKHR::eFifoLatestReady: its extension is enabled. */
         [[nodiscard]] bool supportsFifoLatestReady() const { return _supportsFifoLatestReady; }
+        /** Whether a present can signal a fence when it is done with its semaphores (swapchain_maintenance1). */
+        [[nodiscard]] bool supportsPresentFences() const { return _supportsPresentFences; }
 
         /**
          * @brief Which descriptor kinds a bindless table can hold under descriptor sets: those whose
@@ -185,6 +187,7 @@ namespace kor::vk {
         mutable std::vector<::vk::CommandPool> _commandPools {};                             // every pool ever made
         bool _supportsRayTracing = false;
         bool _supportsFifoLatestReady = false;
+        bool _supportsPresentFences = false;
         BindlessSupport _bindlessSupport {};
         Flags<Feature> _enabledFeatures {};    ///< What of kor::Feature the device was made with.
     };

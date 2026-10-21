@@ -7,6 +7,7 @@
 #include <window.h>
 #include "resourceState.h"
 #include "tokenState.h"
+#include <array>
 #include <cstring>
 #include <mutex>
 #include <ranges>
@@ -541,6 +542,43 @@ namespace kor
             });
         };
 
+        // The last use of each resource, over the range it covered. A read just like it — the same access to the same
+        // range, with nothing else using the resource since — needs no barrier and changes no state: every draw of a
+        // pass binds the same sets, and walking every subresource of each of them for every draw is most of the time
+        // this takes. Only which record used it last moves on, and that is written out (Settle) before anything else
+        // looks at the resource.
+        struct LastUse {
+            ResourceAccess access;
+            kor::u32 range[4];      // base mip, mip count, base layer, layer count
+            Established by;
+            bool unsettled = false;
+        };
+        std::unordered_map<const void*, LastUse> lastUse;
+        const auto repeats = [&](const void* resource, const ResourceAccess access, const std::array<kor::u32, 4> range, const std::size_t at, const Record& record) {
+            if (record.transitions || writes(access)) return false;
+            const auto last = lastUse.find(resource);
+            if (last == lastUse.end() || last->second.access != access || !std::ranges::equal(last->second.range, range)) return false;
+            last->second.by = Established{ at, record.command, record.where };
+            last->second.unsettled = true;
+            return true;
+        };
+        const auto settle = [&](const void* resource) {
+            const auto last = lastUse.find(resource);
+            if (last == lastUse.end() || !last->second.unsettled) return;
+            const auto& [baseMip, mipCount, baseLayer, layerCount] = last->second.range;
+            for (auto mip = baseMip; mip < baseMip + mipCount; ++mip)
+                for (auto layer = baseLayer; layer < baseLayer + layerCount; ++layer)
+                    establishedAt.insert_or_assign(Key{ resource, mip, layer }, last->second.by);
+            last->second.unsettled = false;
+        };
+        const auto remember = [&](const void* resource, const ResourceAccess access, const std::array<kor::u32, 4> range, const std::size_t at, const Record& record) {
+            LastUse& last = lastUse[resource];
+            last.access = access;
+            std::ranges::copy(range, last.range);
+            last.by = Established{ at, record.command, record.where };
+            last.unsettled = false;
+        };
+
         const auto batchFor = [&](const std::size_t index) -> Pending& {
             // Hoist out of an open render pass, otherwise sit immediately before the command.
             const std::size_t at = openPassAt.value_or(index);
@@ -557,6 +595,9 @@ namespace kor
             for (const auto& use : record.uses) {
                 if (use.buffer.Alive()) {
                     const Key key{ use.buffer.Get(), 0, 0 };
+                    if (repeats(key.resource, use.access, { 0, 1, 0, 1 }, i, record)) continue;
+                    settle(key.resource);
+                    remember(key.resource, use.access, { 0, 1, 0, 1 }, i, record);
                     trackedBuffers.emplace(use.buffer.Get(), use.buffer);
                     const auto current = state.find(key);
                     const auto previous = current == state.end()
@@ -598,6 +639,9 @@ namespace kor
                 const auto mipCount = use.levelCount.value_or(use.image->MipLevels() - baseMip);
                 const auto baseLayer = use.baseArrayLayer.value_or(0);
                 const auto layerCount = use.layerCount.value_or(use.image->ArrayLayers() - baseLayer);
+                if (repeats(use.image.Get(), use.access, { baseMip, mipCount, baseLayer, layerCount }, i, record)) continue;
+                settle(use.image.Get());
+                remember(use.image.Get(), use.access, { baseMip, mipCount, baseLayer, layerCount }, i, record);
 
                 // Per subresource: a range can straddle subresources sitting in different
                 // states — right after GenerateMipmaps the last mip is still TransferDst while

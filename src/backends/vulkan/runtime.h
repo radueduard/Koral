@@ -38,6 +38,8 @@ namespace kor::vk
 
         [[nodiscard]] ::vk::Instance getInstance() const { return _instance; }
         [[nodiscard]] const PhysicalDevice& getPhysicalDevice() const { return *_physicalDevice; }
+        /// Whether the instance has VK_KHR_surface_maintenance1, which a device's swapchain_maintenance1 builds on.
+        [[nodiscard]] bool hasSurfaceMaintenance() const { return _surfaceMaintenance; }
 
     private:
         ::vk::Instance _instance;
@@ -80,6 +82,7 @@ namespace kor::vk
             | ::vk::QueueFlagBits::eTransfer;
 
         ::vk::DebugUtilsMessengerEXT _debugMessenger;
+        bool _surfaceMaintenance = false;
 
         std::unique_ptr<kor::vk::PhysicalDevice> _physicalDevice = nullptr;
     };

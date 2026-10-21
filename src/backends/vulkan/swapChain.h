@@ -85,7 +85,8 @@ namespace kor::vk
         /// Whether what it presents is blended with what is behind the window, by its alpha.
         [[nodiscard]] bool compositesAlpha() const { return _composites; }
 
-    	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinishedSemaphores[_imageIndex]; }
+        /// What the frame that renders into the acquired image signals, and that image's present waits for.
+    	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinished; }
         /// Signalled by the acquire made for frame @p slot; what that frame's submit waits for.
         [[nodiscard]] ::vk::Semaphore getImageAvailableSemaphore(const kor::u32 slot) const { return _imageAvailable[slot]; }
         [[nodiscard]] const kor::vk::Queue& getPresentQueue() const { return _presentQueue; }
@@ -99,10 +100,17 @@ namespace kor::vk
         void ResetImageAvailable(kor::u32 slot);
 
         /**
-         * Waits until whichever frame last rendered into the just-acquired image has finished, then
-         * records @p frameFence as that image's owner. Call it after Acquire and before the submit.
+         * Picks the semaphore the frame rendering into the just-acquired image signals for its present.
+         * Where presents signal fences, one no present still waits for; elsewhere the image's own, after
+         * waiting until whichever frame last rendered into the image has finished, recording
+         * @p frameFence as its owner. Call it after Acquire and before the submit.
          */
         void ClaimAcquiredImage(const ::vk::Fence& frameFence);
+        /**
+         * The fence the present of the claimed image signals once it is done with its semaphore, where
+         * presents signal fences (Device::supportsPresentFences); call it once for each such present.
+         */
+        [[nodiscard]] ::vk::Fence PresentFence();
 
     private:
         kor::UVec2 _extent;
@@ -128,7 +136,19 @@ namespace kor::vk
         const kor::vk::Queue& _presentQueue;
         kor::Resource<kor::Image> _swapChainImages;
         kor::Resource<kor::Image> _depthImages;
-        std::vector<::vk::Semaphore> _renderFinishedSemaphores;
+        std::vector<::vk::Semaphore> _renderFinishedSemaphores;   // one per image, where presents signal no fences
+        ::vk::Semaphore _renderFinished;                          // the claimed image's
+
+        // Where presents signal fences: each present's semaphore, back for reuse once its fence says so.
+        struct Presented {
+            ::vk::Fence fence;
+            ::vk::Semaphore semaphore;
+        };
+        std::vector<Presented> _presented;
+        std::vector<::vk::Semaphore> _freeSemaphores;
+        std::vector<::vk::Fence> _freeFences;
+        /// Destroys what presents used, once nothing can still be using it: after the device has gone idle.
+        void DestroyPresented();
         std::vector<::vk::Semaphore> _imageAvailable;   // one per frame in flight
 
         // The in-flight fence of the frame that last rendered into each image, or null for an image

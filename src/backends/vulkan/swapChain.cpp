@@ -232,7 +232,26 @@ namespace kor::vk
             .Build();
     }
 
+    void SwapChain::DestroyPresented() {
+        for (const auto& [fence, semaphore] : _presented) {
+            Context::Device()->destroyFence(fence);
+            Context::Device()->destroySemaphore(semaphore);
+        }
+        for (const auto& fence : _freeFences) Context::Device()->destroyFence(fence);
+        for (const auto& semaphore : _freeSemaphores) Context::Device()->destroySemaphore(semaphore);
+        // A semaphore claimed for a present that never came is in neither list.
+        if (_renderFinished && std::ranges::find(_renderFinishedSemaphores, _renderFinished) == _renderFinishedSemaphores.end())
+            Context::Device()->destroySemaphore(_renderFinished);
+        _renderFinished = nullptr;
+        _presented.clear();
+        _freeFences.clear();
+        _freeSemaphores.clear();
+    }
+
     SwapChain::~SwapChain() {
+        // A present's fence may never signal if the present failed, so not waited for one by one.
+        if (!_presented.empty()) Context::Device().waitIdle();
+        DestroyPresented();
         for (const auto& semaphore : _renderFinishedSemaphores) {
             Context::Device()->destroySemaphore(semaphore);
         }
@@ -247,6 +266,8 @@ namespace kor::vk
     void SwapChain::Resize(const kor::UVec2& newSize) {
         _extent = newSize;
         Context::Device().waitIdle();
+        // Presents to the old swap chain that failed signal no fence: idle is the only word on them.
+        DestroyPresented();
         CreateSwapChain();
         CreateDepthResources();
         // The window's default framebuffer is re-pointed by whoever resized it. @see vk::Scheduler
@@ -276,6 +297,28 @@ namespace kor::vk
     }
 
     void SwapChain::ClaimAcquiredImage(const ::vk::Fence& frameFence) {
+        if (Context::Device().supportsPresentFences()) {
+            // A semaphore no present still waits for, rather than the image's own. A driver hands
+            // back an image whose present has not happened yet — in immediate mode, routinely the one
+            // the frame before drew — and the image's own semaphore is then still to be waited for by
+            // that present; waiting for that frame instead, as below, serialises CPU and GPU.
+            std::erase_if(_presented, [this](const Presented& presented) {
+                if (Context::Device()->getFenceStatus(presented.fence) != ::vk::Result::eSuccess) return false;
+                _freeFences.push_back(presented.fence);
+                _freeSemaphores.push_back(presented.semaphore);
+                return true;
+            });
+            if (!_freeFences.empty())
+                (void)Context::Device()->resetFences(static_cast<kor::u32>(_freeFences.size()), _freeFences.data());
+            if (_freeSemaphores.empty()) {
+                _renderFinished = Context::Device()->createSemaphore({});
+            } else {
+                _renderFinished = _freeSemaphores.back();
+                _freeSemaphores.pop_back();
+            }
+            return;
+        }
+
         // This is *not* the wait the scheduler has already done. That one was on the current frame
         // slot's own fence, which says nothing about the other frames in flight — and a driver
         // routinely hands out more swapchain images than there are frames, so the frame that last
@@ -292,5 +335,19 @@ namespace kor::vk
             }
         }
         _imagesInFlight[_imageIndex] = frameFence;
+        _renderFinished = _renderFinishedSemaphores[_imageIndex];
+    }
+
+    ::vk::Fence SwapChain::PresentFence() {
+        ::vk::Fence fence;
+        if (_freeFences.empty()) {
+            fence = Context::Device()->createFence({});
+        } else {
+            fence = _freeFences.back();
+            _freeFences.pop_back();
+        }
+        _presented.push_back({fence, _renderFinished});
+        _renderFinished = nullptr;   // the present's now
+        return fence;
     }
 }
