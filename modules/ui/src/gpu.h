@@ -21,7 +21,7 @@ namespace kui::detail
         eRect = 0, eEllipse = 1, eArc = 2, eSegment = 3, eTriangle = 4, eBezier = 5,
         eGlyph = 6, eImage = 7, eShadow = 8, eMesh = 9, eCustom = 10, eBackdrop = 11,
     };
-    enum Flag : std::uint32_t { eFill = 1, eStroke = 2, eGradient = 4 };
+    enum Flag : std::uint32_t { eFill = 1, eStroke = 2, eGradient = 4, eNearest = 8 };
 
     inline constexpr std::uint32_t None = 0xffff;
 

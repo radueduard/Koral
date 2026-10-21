@@ -35,14 +35,17 @@ namespace kgui
         }, kui::FlexOptions {}.SetGap(8.f));
     }
 
-    /** @brief Drags side by side, one a component: a vector edited as its numbers. @p set gets them all back, one changed. */
+    /**
+     * @brief Drags side by side, one a component: a vector edited as its numbers. @p set gets them all back, one changed.
+     *        Each kept between @p min and @p max; @p logarithmic, each dragged by so much of what it is (DragValueOptions::logarithmic).
+     */
     inline kui::Widget DragFloats(std::vector<float> values, std::function<void(std::vector<float>)> set, const float speed = 0.01f,
-                                  const int decimals = 2, const float min = -kui::Infinity, const float max = kui::Infinity)
+                                  const int decimals = 2, const float min = -kui::Infinity, const float max = kui::Infinity, const bool logarithmic = false)
     {
         static constexpr const char* axes[] { "X", "Y", "Z", "W" };
         std::vector<kui::Widget> parts;
         for (std::size_t i = 0; i < values.size(); ++i) {
-            auto options = kui::DragValueOptions {}.SetSpeed(speed).SetDecimals(decimals).SetRange(min, max).SetWidth(48.f);
+            auto options = kui::DragValueOptions {}.SetSpeed(speed).SetDecimals(decimals).SetRange(min, max).SetLogarithmic(logarithmic).SetWidth(48.f);
             if (values.size() > 1 && i < 4) options.SetLabel(axes[i]);
             parts.push_back(kui::Expanded(kui::DragValue(values[i], [values, set, i](const float v) {
                 auto changed = values;

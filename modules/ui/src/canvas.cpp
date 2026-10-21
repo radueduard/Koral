@@ -526,7 +526,8 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawImage(const kor::ResourceRef<const kor::Image>& image, const Rect& destination, const Rect& source, const Color tint)
+    Canvas& Canvas::DrawImage(const kor::ResourceRef<const kor::Image>& image, const Rect& destination, const Rect& source, const Color tint,
+                              const ImageFilter filter)
     {
         if (!image.Valid() || destination.Empty()) return *this;
         const kor::Vec2 extent = kor::Vec2(image->Extent().x, image->Extent().y);
@@ -535,6 +536,7 @@ namespace kui
         it.shape0 = { destination.left, destination.top, destination.right, destination.bottom };
         it.shape1 = { src.left / extent.x, src.top / extent.y, src.right / extent.x, src.bottom / extent.y };
         it.fill = tint.Packed();
+        if (filter == ImageFilter::eNearest) it.kindFlags |= detail::eNearest << 8;
         it.SetTexture(_state->AddTexture(image));
         _state->Push(it);
         return *this;

@@ -831,6 +831,30 @@ namespace kor {
             ms = millisecondsSince(start);
         }
 
+        // Several GPU passes one after another into one command buffer, each inside its own timer scope:
+        // a command buffer costs some tens of microseconds to make, end and submit whatever is in it, and a
+        // graph of many small passes — a simulation's dispatches — spends more on that than on its work.
+        // The command buffer works out the barriers between them, as it does between any two commands.
+        Task<void> RunTogetherOnBackground(std::vector<RenderPass*> passes, std::vector<const std::vector<ImageBarrier>*> handoffs,
+                                           std::unique_ptr<CommandBuffer>& out, std::vector<double*> ms,
+                                           std::vector<Token> after, std::shared_ptr<detail::SceneLife> scene, Window* target) {
+            co_await Context::SwitchToBackgroundThread();
+            if (!after.empty()) co_await WhenAll(std::move(after));
+            detail::SceneScope scope(scene);
+            detail::WindowScope window(target);
+            auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+            cb->Begin();
+            for (std::size_t k = 0; k < passes.size(); ++k) {
+                const auto start = Clock::now();
+                cb->BeginTimer(passes[k]->Name());
+                static_cast<const RenderPass&>(*passes[k]).Record(*cb);
+                if (!handoffs[k]->empty()) cb->Barrier({}, *handoffs[k]);
+                cb->EndTimer();
+                *ms[k] = millisecondsSince(start);
+            }
+            out = std::move(cb);
+        }
+
         // Runs on the background pool once the CPU passes this one depends on are done. It moves there
         // before it waits: a token resumes whoever awaits it on the executor they awaited from, and the
         // main thread is blocked until every pass has run.
@@ -905,23 +929,59 @@ namespace kor {
             scheduler.Execute(std::move(clear));
         }
 
-        // Every pass at once, each as soon as the CPU passes it depends on are done. The order GPU
-        // passes finish recording in does not matter: the frame ends their command buffers — which
-        // is where barriers are worked out — in execution order.
-        std::vector<std::unique_ptr<CommandBuffer>> recorded(_order.size());
+        // Every pass at once, each as soon as the CPU passes it depends on are done — or, for GPU passes on
+        // the graphics queue one after another that are cheap to record, several together, into one command
+        // buffer (a run). The order GPU passes finish recording in does not matter: the frame ends their
+        // command buffers — which is where barriers are worked out — in execution order.
+        struct Run { std::size_t first = 0, count = 0; double cost = 0.0; };
+        std::vector<Run> runs;
+        std::vector<std::size_t> runOf(_order.size(), 0);
+        constexpr std::size_t MostTogether = 64;
+        constexpr double CheapTogether = 0.25;     // ms of recording, as recent frames took: what is cheap enough to record one after another
+        const auto together = [&](const std::size_t i) { return !_order[i]->RunsOnCpu() && !_async[i] && !_waits[i]; };
+        for (std::size_t i = 0; i < _order.size(); ++i) {
+            const auto known = _stats->passes.find(_order[i]->Name());
+            const double cost = known == _stats->passes.end() ? 0.0 : known->second.recordMs;
+            if (!runs.empty() && together(i) && together(runs.back().first + runs.back().count - 1) && runs.back().first + runs.back().count == i
+                && runs.back().count < MostTogether && runs.back().cost + cost <= CheapTogether) {
+                ++runs.back().count;
+                runs.back().cost += cost;
+            } else {
+                runs.push_back(Run{ .first = i, .count = 1, .cost = cost });
+            }
+            runOf[i] = runs.size() - 1;
+        }
+
+        std::vector<std::unique_ptr<CommandBuffer>> recorded(runs.size());
         std::vector<double> recordMs(_order.size(), 0.0);
         const auto recordStart = Clock::now();
         _recording = true;
         for (const auto& set : _importedSets | std::views::values) if (set) ++set->_recording;
         {
             std::vector<Task<void>> tasks;
-            tasks.reserve(_order.size());
-            for (std::size_t i = 0; i < _order.size(); ++i) {
+            tasks.reserve(runs.size());
+            for (std::size_t r = 0; r < runs.size(); ++r) {
+                const Run& run = runs[r];
                 std::vector<Token> after;
-                for (const auto dependency : _dependencies[i])
-                    if (_order[dependency]->RunsOnCpu()) after.push_back(tasks[dependency].Completion());
-                tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), _async[i], _handoffs[i], recorded[i], recordMs[i], std::move(after),
-                                                scene->Life().lock(), _target));
+                for (std::size_t i = run.first; i < run.first + run.count; ++i)
+                    for (const auto dependency : _dependencies[i])
+                        if (_order[dependency]->RunsOnCpu() && runOf[dependency] != r) after.push_back(tasks[runOf[dependency]].Completion());
+                if (run.count == 1) {
+                    const std::size_t i = run.first;
+                    tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), _async[i], _handoffs[i], recorded[r], recordMs[i], std::move(after),
+                                                    scene->Life().lock(), _target));
+                    continue;
+                }
+                std::vector<RenderPass*> passes;
+                std::vector<const std::vector<ImageBarrier>*> handoffs;
+                std::vector<double*> ms;
+                for (std::size_t i = run.first; i < run.first + run.count; ++i) {
+                    passes.push_back(_order[i]);
+                    handoffs.push_back(&_handoffs[i]);
+                    ms.push_back(&recordMs[i]);
+                }
+                tasks.push_back(RunTogetherOnBackground(std::move(passes), std::move(handoffs), recorded[r], std::move(ms), std::move(after),
+                                                        scene->Life().lock(), _target));
             }
             auto all = WhenAll(std::move(tasks));
             all.Wait();
@@ -940,18 +1000,21 @@ namespace kor {
             Stats::average(timing.prepareMs, prepareMs[i]);
             Stats::average(timing.recordMs, recordMs[i]);
             recordWork += recordMs[i];
-            if (recorded[i]) {
-                recorded[i]->OnTimings([weak = std::weak_ptr(_stats), name = _order[i]->Name()](const std::vector<TimerResult>& results) {
-                    const auto statsNow = weak.lock();
-                    if (!statsNow) return;   // the graph is gone
-                    for (const auto& result : results) {
-                        if (result.depth != 0 || result.label != name) continue;
-                        auto& timing = statsNow->passes[name];
-                        Stats::average(timing.gpuMs, result.milliseconds);
-                        timing.gpuMeasured = true;
-                    }
-                });
-            }
+        }
+        for (std::size_t r = 0; r < runs.size(); ++r) {
+            if (!recorded[r]) continue;
+            std::set<std::string> names;
+            for (std::size_t i = runs[r].first; i < runs[r].first + runs[r].count; ++i) names.insert(_order[i]->Name());
+            recorded[r]->OnTimings([weak = std::weak_ptr(_stats), names = std::move(names)](const std::vector<TimerResult>& results) {
+                const auto statsNow = weak.lock();
+                if (!statsNow) return;   // the graph is gone
+                for (const auto& result : results) {
+                    if (result.depth != 0 || !names.contains(result.label)) continue;
+                    auto& timing = statsNow->passes[result.label];
+                    Stats::average(timing.gpuMs, result.milliseconds);
+                    timing.gpuMeasured = true;
+                }
+            });
         }
         Stats::average(stats.graph.prepareMs, prepareTotal);
         Stats::average(stats.graph.recordWallMs, recordWall);
@@ -965,20 +1028,22 @@ namespace kor {
 
         // Handed over in order, as one group: the graph orders its own passes, so a pass on the async
         // queue waits only for the pass on the graphics queue it needs — and the other way round —
-        // and runs alongside the rest.
+        // and runs alongside the rest. Every pass of a run is done when its command buffer is.
         bool touchedScreen = false;
         const auto screen = screenOf(TargetWindow());
         const auto group = reinterpret_cast<std::uintptr_t>(this);
         std::vector<Token> done(_order.size());
         std::optional<std::size_t> lastAsync;
-        for (std::size_t i = 0; i < recorded.size(); ++i) {
-            auto& cb = recorded[i];
+        for (std::size_t r = 0; r < runs.size(); ++r) {
+            auto& cb = recorded[r];
             if (!cb) continue;  // a CPU pass, or one that threw (already reported)
+            const std::size_t first = runs[r].first;
             if (screen.Alive() && cb->HasTouched(screen)) touchedScreen = true;
             Scheduler::ExecuteInfo info{ .group = group };
-            if (_waits[i]) info.after.push_back(done[*_waits[i]]);
-            if (_async[i]) lastAsync = i;
-            done[i] = scheduler.Execute(std::move(cb), std::move(info));
+            if (_waits[first]) info.after.push_back(done[*_waits[first]]);
+            if (_async[first]) lastAsync = first;
+            const Token token = scheduler.Execute(std::move(cb), std::move(info));
+            for (std::size_t i = first; i < first + runs[r].count; ++i) done[i] = token;
         }
 
         // After the last pass: what this frame left becomes the next frame's previous frame.

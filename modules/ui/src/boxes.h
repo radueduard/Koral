@@ -148,7 +148,7 @@ namespace kui
 
     class RenderImage final : public RenderContainer {
     public:
-        void Set(const kor::ResourceRef<const kor::Image>& image, ImageFit fit, kor::Vec2 size);
+        void Set(const kor::ResourceRef<const kor::Image>& image, ImageFit fit, kor::Vec2 size, ImageFilter filter);
         void Paint(Canvas& canvas, kor::Vec2 offset) override;
         [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
     protected:
@@ -157,6 +157,7 @@ namespace kui
         kor::ResourceRef<const kor::Image> _image;
         kor::u64 _generation = 0;
         ImageFit _fit = ImageFit::eContain;
+        ImageFilter _filter = ImageFilter::eLinear;
         kor::Vec2 _preferred { -1.f, -1.f };
     };
 

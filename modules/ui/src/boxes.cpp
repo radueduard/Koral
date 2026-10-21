@@ -415,14 +415,15 @@ namespace kui
 
     void RenderParagraph::Paint(Canvas& canvas, const kor::Vec2 offset) { canvas.DrawParagraph(_paragraph, offset); }
 
-    void RenderImage::Set(const kor::ResourceRef<const kor::Image>& image, const ImageFit fit, const kor::Vec2 size)
+    void RenderImage::Set(const kor::ResourceRef<const kor::Image>& image, const ImageFit fit, const kor::Vec2 size, const ImageFilter filter)
     {
         // An image resized in place is the same handle with another extent: laid out and painted again.
         const kor::u64 generation = image.Valid() ? image->Generation() : 0;
-        if (image.Get() == _image.Get() && generation == _generation && fit == _fit && size == _preferred) return;
+        if (image.Get() == _image.Get() && generation == _generation && fit == _fit && size == _preferred && filter == _filter) return;
         _image = image;
         _generation = generation;
         _fit = fit;
+        _filter = filter;
         _preferred = size;
         MarkNeedsLayout();
         MarkNeedsPaint();
@@ -470,7 +471,7 @@ namespace kui
             break;
         }
         }
-        canvas.DrawImage(_image, dst, src);
+        canvas.DrawImage(_image, dst, src, colors::White, _filter);
     }
 
     // ---- painting your own ----------------------------------------------------------------------------
@@ -1073,10 +1074,10 @@ namespace kui
             [](RenderShaderBox& r, const Config& c) { r.Set(c.shader, c.parameters, c.radius); });
     }
 
-    Widget Image(kor::ResourceRef<const kor::Image> image, const ImageFit fit, const kor::Vec2 size)
+    Widget Image(kor::ResourceRef<const kor::Image> image, const ImageFit fit, const kor::Vec2 size, const ImageFilter filter)
     {
-        struct Config { kor::ResourceRef<const kor::Image> image; ImageFit fit; kor::Vec2 size; };
-        return box<RenderImage, Config>({ std::move(image), fit, size }, {},
-            [](RenderImage& r, const Config& c) { r.Set(c.image, c.fit, c.size); });
+        struct Config { kor::ResourceRef<const kor::Image> image; ImageFit fit; kor::Vec2 size; ImageFilter filter; };
+        return box<RenderImage, Config>({ std::move(image), fit, size, filter }, {},
+            [](RenderImage& r, const Config& c) { r.Set(c.image, c.fit, c.size, c.filter); });
     }
 }

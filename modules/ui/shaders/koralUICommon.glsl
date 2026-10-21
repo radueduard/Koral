@@ -28,6 +28,7 @@
 #define KUI_FLAG_FILL      1u
 #define KUI_FLAG_STROKE    2u
 #define KUI_FLAG_GRADIENT  4u   // the fill comes from gradients[paint]
+#define KUI_FLAG_NEAREST   8u   // an image read a texel at a time, each its own square: none blended into the next
 
 #define KUI_NONE 0xffffu
 

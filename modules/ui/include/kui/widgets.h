@@ -562,7 +562,9 @@ namespace kui
         const auto bytes = std::as_bytes(std::span(&parameters, 1));
         return ShaderBox(std::move(shader), std::vector<std::byte>(bytes.begin(), bytes.end()), radius, std::move(child));
     }
-    KUI_API Widget Image(kor::ResourceRef<const kor::Image> image, ImageFit fit = ImageFit::eContain, kor::Vec2 size = { -1.f, -1.f });
+    /** @brief An image, fitted to its box as @p fit says, and read blended or texel by texel as @p filter says. */
+    KUI_API Widget Image(kor::ResourceRef<const kor::Image> image, ImageFit fit = ImageFit::eContain, kor::Vec2 size = { -1.f, -1.f },
+                         ImageFilter filter = ImageFilter::eLinear);
     /** @brief Keeps the child in a layer of its own: repainting it repaints nothing around it, and the other way round. */
     KUI_API Widget RepaintBoundary(Widget child);
     /** @brief The child, faded. Changing it re-records nothing. */
@@ -744,6 +746,10 @@ namespace kui
         /// rather than stopping there; a typed value is brought into the range the same way. The two ends are
         /// one place: the value is never the max, which is the min. Only where both ends are finite.
         bool wrap = false;
+        /// Dragged by so much of what it is, not by so much: each unit dragged multiplies it by 1 + speed — a size,
+        /// a distance, a count that may be 2 or 20 000, as fine near its least as far from it. For what is above
+        /// nothing: from 0, or below its least above 0, it starts at the smallest it shows (a step of its decimals).
+        bool logarithmic = false;
 
         // Chainable: `kui::DragValueOptions{}.SetSpeed(0.1f).SetRange(0, 10)`.
         DragValueOptions& SetSpeed(float value) { speed = value; return *this; }
@@ -754,6 +760,19 @@ namespace kui
         DragValueOptions& SetAxis(Axis value) { axis = value; return *this; }
         DragValueOptions& SetTypeable(bool value) { typeable = value; return *this; }
         DragValueOptions& SetWrap(bool value) { wrap = value; return *this; }
+        DragValueOptions& SetLogarithmic(bool value) { logarithmic = value; return *this; }
+
+        /** @brief What it is when dragged @p travelled units from @p from: added to, or — logarithmic — multiplied. Not kept to its range. */
+        [[nodiscard]] float Dragged(const float from, const float travelled) const {
+            if (!logarithmic) return from + travelled * speed;
+            // Nothing is no start for a product: the least it shows above nothing, or its least, is.
+            const float smallest = std::max(min > 0.f ? min : 0.f, std::pow(10.f, -static_cast<float>(std::max(decimals, 0))));
+            const float start = std::max(std::abs(from), smallest);
+            const float sign = from < 0.f ? -1.f : 1.f;
+            const float to = start * std::pow(1.f + std::max(speed, 1e-4f), travelled);
+            // Dragged back below where it started from nothing: nothing again.
+            return std::abs(from) < smallest && to <= smallest && travelled < 0.f ? (min > 0.f ? min : 0.f) : sign * to;
+        }
 
         /** @brief @p value brought into the range: wrapped round it, where it wraps; kept at its ends, where not. */
         [[nodiscard]] float Keep(const float value) const
@@ -790,7 +809,9 @@ namespace kui
         std::function<void()> onSelected;
         bool enabled = true;
         bool separator = false;
-        /// Not empty: a submenu. Pressed, it opens in place, its lines under it, indented; pressed again, it closes.
+        /// Not empty: a submenu. It opens beside the menu, level with its line, as the pointer comes onto that line (or it
+        /// is pressed) — and its own submenus beside it in turn — and shuts as the pointer comes onto another line of the
+        /// menu. What is picked in any of them closes them all.
         std::vector<MenuItem> items;
     };
     /** @brief @p child, with a menu of @p items that opens where the right button is pressed on it. */

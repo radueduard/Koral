@@ -57,7 +57,12 @@ void main() {
         const vec4 rect = kind == KUI_GLYPH ? it.bounds : it.shape0;
         vec2 t = (p - rect.xy) / max(rect.zw - rect.xy, vec2(1e-6));
         if (kind == KUI_GLYPH) t = clamp(t, 0.0, 1.0);
-        const vec2 uv = mix(it.shape1.xy, it.shape1.zw, t);
+        vec2 uv = mix(it.shape1.xy, it.shape1.zw, t);
+        if (kind == KUI_IMAGE && (flags & KUI_FLAG_NEAREST) != 0u) {
+            // The middle of the texel it falls in: the one sampler, filtering nothing.
+            const vec2 texels = vec2(textureSize(sampler2D(kuiTextures[nonuniformEXT(kuiTexture(it))], kuiSampler), 0));
+            uv = (floor(uv * texels) + 0.5) / texels;
+        }
         const vec4 texel = texture(sampler2D(kuiTextures[nonuniformEXT(kuiTexture(it))], kuiSampler), uv);
         if (kind == KUI_GLYPH) {
             // The atlas holds distance from the outline, 0.5 on it; strokeWidth scales it to local units.

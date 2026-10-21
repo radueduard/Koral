@@ -917,7 +917,7 @@ class RenderTextField final : public RenderContainer {
                     if (!_held) { _held = true; if (const Owner* owner = GetOwner(); owner && owner->lockPointer) owner->lockPointer(true); }
                     // From where it was pressed, not step by step: the value does not drift when it is held at a limit.
                     _travelled += Upright() ? -event.delta.y : event.delta.x;
-                    const float value = _config.options.Keep(_from + _travelled * _config.options.speed);
+                    const float value = _config.options.Keep(_config.options.Dragged(_from, _travelled));
                     if (value != _config.value && _config.onChanged) _config.onChanged(value);
                     return true;   // a drag on it is its own
                 }
@@ -1150,7 +1150,7 @@ class RenderTextField final : public RenderContainer {
 
         // ---- menus ----------------------------------------------------------------------------------------
 
-        constexpr float MenuRow = 36.f, MenuPad = 6.f, MenuLine = 9.f, MenuIndent = 16.f;
+        constexpr float MenuRow = 36.f, MenuPad = 6.f, MenuLine = 9.f;
         /// The tallest a menu is: past that, it scrolls — a dropdown of a hundred names is a list to scroll, not a wall.
         constexpr float MenuMost = 440.f;
 
@@ -1161,27 +1161,54 @@ class RenderTextField final : public RenderContainer {
             return { width, std::min(height, MenuMost + 2.f * MenuPad) };
         }
 
-        /** How wide a menu of @p items wants to be: its longest line — a submenu's, indented — and room around it. */
-        float menuWidth(const std::vector<MenuItem>& items, const float least, const float indent = 0.f)
+        /** How wide a menu of @p items wants to be: its longest line, the arrow of a submenu's, and room around it. Its submenus are their own. */
+        float menuWidth(const std::vector<MenuItem>& items, const float least)
         {
             float width = least;
             const TextStyle style = Theme::Current().textStyle;
             for (const auto& item : items) {
                 if (item.separator) continue;
-                width = std::max(width, Paragraph(item.label, style).MaxIntrinsicWidth() + 44.f + indent + (item.items.empty() ? 0.f : 20.f));
-                if (!item.items.empty()) width = std::max(width, menuWidth(item.items, least, indent + MenuIndent));
+                width = std::max(width, Paragraph(item.label, style).MaxIntrinsicWidth() + 44.f + (item.items.empty() ? 0.f : 24.f));
             }
             return width;
         }
 
-        /** The list a popup shows: one line an item, lit under the pointer; picking one runs it and closes the popup. */
+        /** How wide the least a submenu is. */
+        constexpr float SubmenuLeast = 160.f;
+
+        /**
+         * How much room a menu of @p items, @p width wide, takes with its submenus open beside it — the deepest of them:
+         * what a popup is kept inside the view by, so that what opens from it is there to be seen.
+         */
+        kor::Vec2 menuCascade(const std::vector<MenuItem>& items, const float width)
+        {
+            const kor::Vec2 own = menuSize(items, width);
+            float wide = 0.f, tall = own.y, y = 0.f;
+            for (const auto& item : items) {
+                if (item.separator) { y += MenuLine; continue; }
+                if (!item.items.empty()) {
+                    const kor::Vec2 beside = menuCascade(item.items, menuWidth(item.items, SubmenuLeast));
+                    wide = std::max(wide, beside.x);
+                    tall = std::max(tall, y + beside.y);
+                }
+                y += MenuRow;
+            }
+            return { width + wide, tall };
+        }
+
+        /**
+         * The list a popup shows: one line an item, lit under the pointer; picking one runs it and closes the popup. A
+         * submenu's line opens it beside the menu, level with the line, as the pointer comes onto it — and its own, beside
+         * it in turn: what is picked in any of them closes them all.
+         */
         struct MenuWidget final : StatefulWidget {
             std::vector<MenuItem> items;
             float width;
             int marked;                 ///< The one shown as chosen already (a dropdown's selection), or -1.
             std::function<void()> close;
-            int hovered = -1;           ///< Of the lines as shown, submenus' that are open among them.
-            std::set<std::string> open; ///< The submenus open, by where they are: "2", "2/0".
+            int hovered = -1;
+            int open = -1;              ///< The line whose submenu is open beside the menu, or -1.
+            float openAt = 0.f;         ///< How far down the menu that line is.
 
             MenuWidget(std::vector<MenuItem> i, const float w, const int m, std::function<void()> c)
                 : items(std::move(i)), width(w), marked(m), close(std::move(c)) {}
@@ -1189,6 +1216,7 @@ class RenderTextField final : public RenderContainer {
             void DidUpdateWidget(const StatefulWidget& newer) override
             {
                 const auto& m = static_cast<const MenuWidget&>(newer);
+                if (m.items.size() != items.size()) open = -1;
                 items = m.items;
                 width = m.width;
                 marked = m.marked;
@@ -1200,29 +1228,34 @@ class RenderTextField final : public RenderContainer {
                 const Theme& t = Theme::Current();
                 std::vector<Widget> rows;
                 float height = 0.f;
-                int line = 0;
-                const std::function<void(const std::vector<MenuItem>&, const std::string&, float)> add = [&](const std::vector<MenuItem>& list, const std::string& path, const float indent) {
-                for (std::size_t i = 0; i < list.size(); ++i) {
-                    const MenuItem& item = list[i];
+                for (std::size_t i = 0; i < items.size(); ++i) {
+                    const MenuItem& item = items[i];
                     if (item.separator) {
                         rows.push_back(Container({ .height = MenuLine, .padding = EdgeInsets::Symmetric(12.f, (MenuLine - 1.f) * 0.5f) },
                                                  Container({ .decoration = { .color = t.border } })));
                         height += MenuLine;
                         continue;
                     }
-                    const std::string at = path.empty() ? std::to_string(i) : path + "/" + std::to_string(i);
+                    const int index = static_cast<int>(i);
                     const bool submenu = !item.items.empty();
-                    const bool opened = submenu && open.contains(at);
-                    const int index = line++;
-                    const bool lit = hovered == index && item.enabled;
+                    const bool opened = submenu && open == index;
+                    const bool lit = (hovered == index || opened) && item.enabled;
                     TextStyle style = t.textStyle;
-                    const bool chosen = path.empty() && static_cast<int>(i) == marked;
+                    const bool chosen = index == marked;
                     style.color = !item.enabled ? t.textMuted.WithAlpha(0.6f) : chosen ? t.primary : t.text;
                     GestureOptions gestures;
-                    gestures.onEnter = [this, index] { SetState([this, index] { hovered = index; }); };
+                    // Under the pointer, a submenu's line opens it, and any other line of this menu shuts the one open.
+                    gestures.onEnter = [this, index, submenu, enabled = item.enabled, at = height] {
+                        SetState([&] {
+                            hovered = index;
+                            if (submenu && enabled) { open = index; openAt = at; }
+                            else open = -1;
+                        });
+                    };
                     gestures.onExit = [this, index] { SetState([this, index] { if (hovered == index) hovered = -1; }); };
                     if (item.enabled && submenu) {
-                        gestures.onTap = [this, at] { SetState([this, at] { if (!open.erase(at)) open.insert(at); }); };
+                        // Pressed, it is open: the pointer that came onto it opened it already, and a press is no shutting it.
+                        gestures.onTap = [this, index, at = height] { SetState([&] { open = index; openAt = at; }); };
                     } else if (item.enabled) {
                         gestures.onTap = [this, selected = item.onSelected] {
                             // Copied out first: closing the popup takes this widget, and its items — and this very
@@ -1261,30 +1294,32 @@ class RenderTextField final : public RenderContainer {
                     default: break;
                     }
                     if (!label) label = Text(item.label, style, TextAlign::eStart, false);
-                    // A submenu says it is one, and whether it is open: an arrow at the end of its line.
-                    if (submenu) {
-                        TextStyle arrow = style;
-                        arrow.color = t.textMuted;
+                    // A submenu says it is one: an arrow at the end of its line, towards where it opens.
+                    if (submenu)
                         label = Row({ std::move(label), SizedBox(8.f, 0.f).Expanded(),
-                                      SizedBox(16.f, 16.f, Icon(opened ? "expand_more" : "chevron_right", IconStyle::eFilled, arrow.color)) },
+                                      SizedBox(16.f, 16.f, Icon("chevron_right", IconStyle::eFilled, lit && t.design == ThemeDesign::eCupertino ? t.onPrimary : t.textMuted)) },
                                     { .crossAxisAlignment = CrossAxisAlignment::eCenter });
-                    }
                     rows.push_back(GestureDetector(std::move(gestures), Container({
                         .height = MenuRow,
-                        .padding = EdgeInsets { 14.f + indent, 0.f, 14.f, 0.f },
+                        .padding = EdgeInsets { 14.f, 0.f, 14.f, 0.f },
                         .decoration = { .color = fill, .radius = round },
                         .alignment = Alignment::CenterLeft(),
                     }, std::move(label))));
                     height += MenuRow;
-                    if (opened) add(item.items, at, indent + MenuIndent);
                 }
-                };
-                add(items, {}, 0.f);
                 Widget list = Column(std::move(rows), { .crossAxisAlignment = CrossAxisAlignment::eStretch });
                 // Taller than a menu should be: it scrolls.
                 if (height > MenuMost) list = SizedBox(-1.f, MenuMost, ScrollView(std::move(list)));
                 // It fades in where it opens: in place, so that what is pressed in it is where it is seen.
-                return Appear(Sheet(t, std::move(list)), AnimationOptions {}.SetDuration(0.12f).SetCurve(Curve::eEaseOut), 0.f);
+                Widget sheet = Appear(Sheet(t, std::move(list)), AnimationOptions {}.SetDuration(0.12f).SetCurve(Curve::eEaseOut), 0.f);
+                // Beside it, the submenu open — level with its line — or nothing: the sheet stays where it is either way.
+                Widget beside = SizedBox(0.f, 0.f);
+                if (open >= 0 && static_cast<std::size_t>(open) < items.size() && !items[static_cast<std::size_t>(open)].items.empty()) {
+                    const auto& sub = items[static_cast<std::size_t>(open)].items;
+                    beside = Padding(EdgeInsets { 2.f, std::min(openAt, MenuMost), 0.f, 0.f },
+                                     Make<MenuWidget>(sub, menuWidth(sub, SubmenuLeast), -1, close).Key(std::to_string(open)));
+                }
+                return Row({ std::move(sheet), std::move(beside) }, { .crossAxisAlignment = CrossAxisAlignment::eStart });
             }
 
             /** The sheet a menu's lines are on, as the design has one. */
@@ -1449,7 +1484,7 @@ class RenderTextField final : public RenderContainer {
                 if (!owner || !owner->showPopup || _items.empty()) return false;
                 const float width = menuWidth(_items, 160.f);
                 owner->showPopup(Make<MenuWidget>(_items, width, -1, [owner] { if (owner->closePopup) owner->closePopup(); }),
-                                 event.position, menuSize(_items, width));
+                                 event.position, menuCascade(_items, width));
                 return true;
             }
 
@@ -1525,7 +1560,7 @@ class RenderTextField final : public RenderContainer {
                 if (!owner || !owner->showPopup || _menu.items.empty()) return;
                 const float width = menuWidth(_menu.items, 180.f);
                 owner->showPopup(Make<MenuWidget>(_menu.items, width, -1, [owner] { if (owner->closePopup) owner->closePopup(); }),
-                                 ToGlobal({ 0.f, Size().y + 2.f }), menuSize(_menu.items, width));
+                                 ToGlobal({ 0.f, Size().y + 2.f }), menuCascade(_menu.items, width));
             }
 
             Menu _menu;
@@ -1734,7 +1769,7 @@ class RenderTextField final : public RenderContainer {
     {
         if (!owner.showPopup || items.empty()) return;
         const float width = menuWidth(items, 160.f);
-        owner.showPopup(Make<MenuWidget>(items, width, -1, [&owner] { if (owner.closePopup) owner.closePopup(); }), at, menuSize(items, width));
+        owner.showPopup(Make<MenuWidget>(items, width, -1, [&owner] { if (owner.closePopup) owner.closePopup(); }), at, menuCascade(items, width));
     }
 
     Widget ContextMenu(std::vector<MenuItem> items, Widget child)

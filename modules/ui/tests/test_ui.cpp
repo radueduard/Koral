@@ -393,6 +393,21 @@ TEST(Paragraph, WrapsAtWordsAndMeasuresItsLines) {
     EXPECT_EQ(one.IndexAt(caret + kor::Vec2(0.5f, 2.f)), 6u);
 }
 
+// A drag adds so much a unit dragged; a logarithmic one multiplies by so much — a size doubles in as far as it halves —
+// and from nothing it starts at the least it shows.
+TEST(DragValue, ALogarithmicOneIsDraggedBySoMuchOfWhatItIs) {
+    const auto linear = kui::DragValueOptions {}.SetSpeed(0.01f);
+    EXPECT_FLOAT_EQ(linear.Dragged(1.f, 10.f), 1.1f);
+    const auto log = kui::DragValueOptions {}.SetSpeed(0.01f).SetLogarithmic(true);
+    const float doubling = std::log(2.f) / std::log(1.01f);
+    EXPECT_NEAR(log.Dragged(100.f, doubling), 200.f, 0.01f);
+    EXPECT_NEAR(log.Dragged(4096.f, doubling), 8192.f, 0.5f) << "as far for a big one as for a small one";
+    EXPECT_NEAR(log.Dragged(1.f, -doubling), 0.5f, 1e-4f);
+    EXPECT_NEAR(log.Dragged(0.f, doubling), 0.02f, 1e-5f) << "from nothing, from the least it shows: 0.01 for two decimals";
+    EXPECT_EQ(log.Dragged(0.f, -5.f), 0.f) << "and back down, nothing again";
+    EXPECT_NEAR(kui::DragValueOptions {}.SetLogarithmic(true).SetRange(1.f, 16.f).Dragged(0.f, 0.f), 1.f, 1e-6f) << "from below its least above nothing, its least";
+}
+
 TEST(Transform, ComposesLikeMatrices) {
     const auto t = kui::Transform::Translation({ 10, 0 }) * kui::Transform::Rotation(std::numbers::pi_v<float> * 0.5f);
     const kor::Vec2 p = t.Apply({ 1, 0 });
@@ -454,6 +469,24 @@ namespace {
             c.DrawRect(kui::Rect::FromSize(s), kui::Paint::Fill(color));
         });
     }
+}
+
+// An image drawn bigger than it is: blended between its texels, or — nearest — each texel a square of its own, as a
+// height map's cells are looked at.
+TEST_F(WidgetTest, AnImageIsDrawnBlendedOrATexelASquare) {
+    const kor::U8Vec4 texels[] { { 0, 0, 0, 255 }, { 255, 255, 255, 255 } };
+    const auto image = kor::Image::Builder().SetFormat(kor::Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2 { 2, 1 })
+        .SetUsage(kor::Flags<kor::Image::Usage>(kor::Image::Usage::eSampled) | kor::Image::Usage::eTransferDst)
+        .SetData(std::span<const kor::U8Vec4>(texels)).Build();
+    ASSERT_TRUE(image.Valid());
+    const kor::ResourceRef<const kor::Image> shown(image);
+    Show(kui::Image(shown, kui::ImageFit::eFill, { static_cast<float>(Size), static_cast<float>(Size) }));
+    const int between = static_cast<int>(Size) * 3 / 8;     // left of the middle, where the two blend
+    EXPECT_GT(scene->At(between, 8).x, 20) << "blended: part of the white texel";
+    EXPECT_LT(scene->At(between, 8).x, 235);
+    Show(kui::Image(shown, kui::ImageFit::eFill, { static_cast<float>(Size), static_cast<float>(Size) }, kui::ImageFilter::eNearest));
+    EXPECT_LE(scene->At(between, 8).x, 5) << "nearest: the black texel, all of it";
+    EXPECT_GE(scene->At(static_cast<int>(Size) - between, 8).x, 250) << "and the white one beside it";
 }
 
 TEST_F(WidgetTest, RowsShareWhatIsLeftAmongTheirExpandedChildren) {
@@ -3072,6 +3105,64 @@ TEST(NodeSheet, Renders) {
     for (int i = 0; i < 3; ++i) settle();
     const auto pixels = scene->readback->Read<kor::U8Vec4>(static_cast<std::size_t>(NodeSheetW) * NodeSheetH);
     stbi_write_png(out, NodeSheetW, NodeSheetH, 4, pixels.data(), NodeSheetW * 4);
+    s_app->Close(*scene);
+    settle();
+}
+
+// A context menu's submenu opens beside it as the pointer comes onto its line, level with that line — and its own beside
+// it in turn, as imgui's do. Another line of the menu shuts it; what is picked in any of them runs, and closes them all.
+TEST(Menus, ASubmenuOpensBesideItsLineAndPickingInItClosesThemAll) {
+    if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
+    auto* scene = s_app->OpenOffscreen<DockScene>({ .title = "menus", .extent = { 640, 400 } });
+    ASSERT_NE(scene, nullptr);
+    std::string picked;
+    scene->ui.SetRoot(kui::ContextMenu({
+        { "Create", {}, true, false, {
+            { "Mesh", {}, true, false, { { "Cube", [&] { picked = "Cube"; } }, { "Sphere", [&] { picked = "Sphere"; } } } },
+            { "Light", [&] { picked = "Light"; } },
+        } },
+        { "Delete", [&] { picked = "Delete"; } },
+    }, kui::Container(kui::ContainerOptions {}.SetSize(640.f, 400.f).SetDecoration(kui::Decoration {}.SetColor(kui::Color::Hex(0x202020))))));
+    settle();
+    const auto shows = [&](const std::string_view text) { settle(); settle(); return std::ranges::contains(kui::debug::Texts(scene->ui), std::string(text)); };
+    const auto at = [&](const kor::Vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); settle(); };
+    auto& input = scene->SceneInput();
+    at({ 50.f, 50.f });
+    input.FeedMouseButton(kor::MouseButton::eRight, true);
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eRight, false);
+    EXPECT_TRUE(shows("Delete"));
+    EXPECT_FALSE(shows("Mesh")) << "a submenu is shut until it is come onto";
+
+    // Its line, 6 + 18 down: beside the menu, its submenu, level with it — and that one's beside it.
+    at({ 90.f, 74.f });
+    EXPECT_TRUE(shows("Mesh"));
+    EXPECT_TRUE(shows("Light"));
+    at({ 260.f, 74.f });
+    EXPECT_TRUE(shows("Cube")) << "a submenu of the submenu, beside it";
+    EXPECT_TRUE(shows("Delete")) << "the menu stays";
+
+    // Pressed, as well as come onto, a submenu's line keeps it open.
+    input.FeedMouseButton(kor::MouseButton::eLeft, true);
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, false);
+    EXPECT_TRUE(shows("Cube")) << "a press on its line is no shutting it";
+
+    // Another line of the menu shuts what is open beside it.
+    at({ 90.f, 110.f });
+    EXPECT_FALSE(shows("Mesh"));
+    at({ 90.f, 74.f });
+    at({ 260.f, 74.f });
+    ASSERT_TRUE(shows("Cube"));
+
+    // Picked in the deepest: it runs, and every menu is gone.
+    at({ 420.f, 74.f });
+    input.FeedMouseButton(kor::MouseButton::eLeft, true);
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, false);
+    settle();
+    EXPECT_EQ(picked, "Cube");
+    EXPECT_FALSE(shows("Delete"));
     s_app->Close(*scene);
     settle();
 }

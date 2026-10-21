@@ -398,6 +398,9 @@ namespace kui
      * layer->SetPicture(canvas.Finish());
      * @endcode
      */
+    /** @brief How an image drawn bigger or smaller than it is reads its texels: blended, or the nearest. */
+    enum class ImageFilter : std::uint8_t { eLinear, eNearest };
+
     class KUI_API  Canvas {
     public:
         Canvas();
@@ -470,9 +473,13 @@ namespace kui
         Canvas& DrawBackdrop(const RRect& rrect, const Backdrop& backdrop = {});
 
         // -- images and text
-        /** @brief @p image (the part @p source covers, in pixels; all of it by default) stretched over @p destination. */
+        /**
+         * @brief @p image (the part @p source covers, in pixels; all of it by default) stretched over @p destination:
+         *        blended between its texels, or — ImageFilter::eNearest — each texel a square of its own, as a texture
+         *        is looked at closely.
+         */
         Canvas& DrawImage(const kor::ResourceRef<const kor::Image>& image, const Rect& destination,
-                       const Rect& source = {}, Color tint = colors::White);
+                       const Rect& source = {}, Color tint = colors::White, ImageFilter filter = ImageFilter::eLinear);
         /** @brief Laid-out text, its top-left at @p position. */
         Canvas& DrawParagraph(const Paragraph& paragraph, kor::Vec2 position);
         /** @brief One line of text, its top-left at @p position. Lays it out every call: keep a Paragraph for text drawn often. */
