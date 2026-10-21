@@ -178,6 +178,12 @@ namespace kui
         std::function<void(kor::Vec2 at, kor::Vec2 viewAt)> onContextMenu;
         /** @brief A wire let go over nothing, from @p from (an output's or an input's), at @p at in the graph. */
         std::function<void(const PortRef& from, bool fromOutput, kor::Vec2 at)> onWireDropped;
+        /**
+         * @brief A wire let go on another node, but on no port of it that fits: from @p from (an output's or an input's)
+         *        onto @p node, at @p at in the graph — for the caller to offer the node's ports that would take it.
+         *        Not told, the wire is let go as over nothing.
+         */
+        std::function<void(const PortRef& from, bool fromOutput, const std::string& node, kor::Vec2 at)> onWireDroppedOnNode;
         /** @brief What is picked changed. */
         std::function<void(const std::vector<std::string>& nodes)> onSelectionChanged;
         /** @brief A comment moved or resized: its new rectangle. Nodes it carried are told through onMove. */
@@ -209,6 +215,11 @@ namespace kui
         NodeEditorOptions& OnDuplicate(std::function<void(const std::vector<std::string>&)> f) { onDuplicate = std::move(f); return *this; }
         NodeEditorOptions& OnContextMenu(std::function<void(kor::Vec2, kor::Vec2)> f) { onContextMenu = std::move(f); return *this; }
         NodeEditorOptions& OnWireDropped(std::function<void(const PortRef&, bool, kor::Vec2)> f) { onWireDropped = std::move(f); return *this; }
+        NodeEditorOptions& OnWireDroppedOnNode(std::function<void(const PortRef&, bool, const std::string&, kor::Vec2)> f)
+        {
+            onWireDroppedOnNode = std::move(f);
+            return *this;
+        }
         NodeEditorOptions& OnSelectionChanged(std::function<void(const std::vector<std::string>&)> f) { onSelectionChanged = std::move(f); return *this; }
         NodeEditorOptions& OnCommentChanged(std::function<void(const std::string&, Rect)> f) { onCommentChanged = std::move(f); return *this; }
         NodeEditorOptions& OnActivate(std::function<void(const std::string&)> f) { onActivate = std::move(f); return *this; }

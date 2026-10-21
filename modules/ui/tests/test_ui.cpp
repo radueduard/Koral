@@ -2832,6 +2832,41 @@ TEST_F(NodeTest, AWireIsPickedUpOffTheInputItGoesInto) {
     EXPECT_EQ(offeredFrom, (kui::PortRef { "A", "out" }));
 }
 
+TEST_F(NodeTest, AWireLetGoOnANodeOffersThatNode) {
+    std::vector<kui::GraphWire> made;
+    kui::PortRef offeredFrom;
+    std::string offeredNode;
+    bool fromOutput = false, overNothing = false;
+    auto graph = TwoNodes();
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}
+        .OnConnect([&](const kui::GraphWire& w) { made.push_back(w); })
+        .OnWireDropped([&](const kui::PortRef&, bool, kor::Vec2) { overNothing = true; })
+        .OnWireDroppedOnNode([&](const kui::PortRef& from, bool output, const std::string& node, kor::Vec2) {
+            offeredFrom = from;
+            fromOutput = output;
+            offeredNode = node;
+        })));
+    // From A's output onto B's title, not its port: B is offered, nothing is wired.
+    Drag(PortAt({ 20, 20 }, true, 0), { 260.f, 30.f });
+    EXPECT_EQ(offeredFrom, (kui::PortRef { "A", "out" }));
+    EXPECT_TRUE(fromOutput);
+    EXPECT_EQ(offeredNode, "B");
+    EXPECT_TRUE(made.empty());
+    EXPECT_FALSE(overNothing) << "on a node is not over nothing";
+
+    // The other way: from B's input onto A.
+    offeredNode.clear();
+    Drag(PortAt({ 220, 20 }, false, 0), { 60.f, 30.f });
+    EXPECT_EQ(offeredFrom, (kui::PortRef { "B", "in" }));
+    EXPECT_FALSE(fromOutput);
+    EXPECT_EQ(offeredNode, "A");
+
+    // Onto its own node is nothing.
+    offeredNode.clear();
+    Drag(PortAt({ 20, 20 }, true, 0), { 60.f, 30.f });
+    EXPECT_TRUE(offeredNode.empty());
+}
+
 TEST_F(NodeTest, ANodesOwnControlsWorkAndDoNotDragIt) {
     int pressed = 0;
     std::vector<std::string> moved;

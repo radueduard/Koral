@@ -666,12 +666,17 @@ namespace kui
                         return;
                     }
                 }
-                // Let go over nothing it fits: a picked-up wire is taken away; a new one is offered.
+                // Let go over nothing it fits: a picked-up wire is taken away; a new one is offered — on another node,
+                // for one of that node's ports.
                 if (_pickedUp) {
                     if (o.onDisconnect) o.onDisconnect(*_pickedUp);
-                } else if (!target && o.onWireDropped) {
-                    o.onWireDropped(_wireFrom, _wireFromOutput, graph);
+                    return;
                 }
+                const GraphNode* under = NodeAt(graph);
+                if (under && under->id != _wireFrom.node && o.onWireDroppedOnNode)
+                    o.onWireDroppedOnNode(_wireFrom, _wireFromOutput, under->id, graph);
+                else if (!target && !under && o.onWireDropped)
+                    o.onWireDropped(_wireFrom, _wireFromOutput, graph);
             }
 
             [[nodiscard]] Rect ResizedComment() const
