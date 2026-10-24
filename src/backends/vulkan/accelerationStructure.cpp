@@ -175,9 +175,10 @@ namespace kor::vk
             vkInstances.push_back(::vk::AccelerationStructureInstanceKHR()
                 .setTransform(transform)
                 .setInstanceCustomIndex(instance.instanceCustomIndex)
-                .setMask(0xFF)
+                .setMask(instance.mask)
                 .setInstanceShaderBindingTableRecordOffset(instance.hitGroupIndex)
-                .setFlags(::vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable)
+                .setFlags(::vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable
+                          | (instance.opaque ? ::vk::GeometryInstanceFlagBitsKHR::eForceOpaque : ::vk::GeometryInstanceFlagBitsKHR::eForceNoOpaque))
                 .setAccelerationStructureReference(blas.deviceAddress()));
         }
 

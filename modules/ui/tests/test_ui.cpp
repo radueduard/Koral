@@ -2660,9 +2660,9 @@ namespace {
                                 .inputs = { { .id = "in", .label = "Image", .type = "image" }, { .id = "n", .label = "Count", .type = "number" } } });
             return g;
         }
-        /** @brief Where a port is in the view, at zoom 1 and no pan: nodes are 140 wide unless they need more. */
-        static kor::Vec2 PortAt(const kor::Vec2 node, const bool output, const std::size_t index, const float width = kui::nodes::MinWidth) {
-            return node + kui::nodes::PortOffset(output, index, width);
+        /** @brief Where a port is in the view, at zoom 1 and no pan, of a node with @p outputs outputs (its inputs are under them). */
+        static kor::Vec2 PortAt(const kor::Vec2 node, const bool output, const std::size_t index, const float width = kui::nodes::MinWidth, const std::size_t outputs = 0) {
+            return node + kui::nodes::PortOffset(output, index, width, outputs);
         }
         DockScene* scene = nullptr;
     };
@@ -2682,6 +2682,56 @@ TEST_F(NodeTest, AWireIsDrawnBetweenPortsThatFit) {
     Drag(in, out);
     ASSERT_EQ(made.size(), 2u) << "drawn the other way, from the input";
     EXPECT_EQ(made[1], (kui::GraphWire { { "A", "out" }, { "B", "in" } }));
+}
+
+// A port has a row of its own: a node's outputs first, then its inputs under them. A wire goes into the input where
+// kui::nodes says it is — under the output, not level with it.
+TEST_F(NodeTest, OutputsComeFirstAndEachInputHasARowUnderThem) {
+    std::vector<kui::GraphWire> made;
+    auto graph = TwoNodes();
+    graph.nodes[1].outputs = { { .id = "out", .label = "Image", .type = "image" } };
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}.OnConnect([&](const kui::GraphWire& w) { made.push_back(w); })));
+    const kor::Vec2 in = PortAt({ 220, 20 }, false, 0, kui::nodes::MinWidth, 1);
+    EXPECT_FLOAT_EQ(in.y - PortAt({ 220, 20 }, true, 0).y, kui::nodes::RowHeight) << "a row under B's output";
+    Drag(PortAt({ 20, 20 }, true, 0), in);
+    ASSERT_EQ(made.size(), 1u);
+    EXPECT_EQ(made[0], (kui::GraphWire { { "A", "out" }, { "B", "in" } }));
+}
+
+// A node's card is drawn in the theme it is in: one set over the editor (Themed) as well as the view's. It was built
+// when the editor was asked for, before any theme set over it applied — dark cards, and dark titles on them, in a light one.
+TEST_F(NodeTest, ACardIsDrawnInTheThemeItIsIn) {
+    kui::NodeGraph graph;
+    graph.nodes.push_back({ .id = "A", .title = "A", .position = { 20.f, 20.f }, .body = kui::SizedBox(140.f, 40.f) });
+    Show(kui::Themed(kui::Theme::Light(), kui::NodeEditor(graph)));
+    const auto p = scene->At(20 + 70, 20 + static_cast<int>(kui::nodes::TitleHeight) + 24);   // in its body, where nothing is
+    EXPECT_GT(p.x, 200) << "a light theme's surface, not a dark one's";
+    EXPECT_GT(p.y, 200);
+}
+
+// Each family's theme is in its design, dark or light as asked; koral-ui's own is Dark() and Light() as they are.
+TEST(Theme, OfEachDesignIsInThatDesignAndAsDarkAsAsked) {
+    for (const auto design : { kui::ThemeDesign::eKoral, kui::ThemeDesign::eMaterial, kui::ThemeDesign::eCupertino, kui::ThemeDesign::eFluent })
+        for (const bool dark : { true, false }) {
+            const kui::Theme t = kui::Theme::Of(design, dark);
+            EXPECT_EQ(t.design, design);
+            EXPECT_EQ(t.IsDark(), dark) << "design " << static_cast<int>(design);
+        }
+    EXPECT_EQ(kui::Theme::Of(kui::ThemeDesign::eKoral, true).primary.r, kui::Theme::Dark().primary.r);
+    EXPECT_EQ(kui::Theme::Of(kui::ThemeDesign::eKoral, false).background.r, kui::Theme::Light().background.r);
+}
+
+// Every design draws a node its own way, but its ports are where kui::nodes says, in each: a wire is drawn between them alike.
+TEST_F(NodeTest, EveryDesignKeepsThePortsWhereTheyAre) {
+    for (const auto design : { kui::ThemeDesign::eKoral, kui::ThemeDesign::eMaterial, kui::ThemeDesign::eCupertino, kui::ThemeDesign::eFluent }) {
+        kui::Theme theme = kui::Theme::Light();
+        theme.design = design;
+        std::vector<kui::GraphWire> made;
+        Show(kui::Themed(theme, kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}.OnConnect([&](const kui::GraphWire& w) { made.push_back(w); }))));
+        Drag(PortAt({ 20, 20 }, true, 0), PortAt({ 220, 20 }, false, 0));
+        ASSERT_EQ(made.size(), 1u) << "design " << static_cast<int>(design);
+        EXPECT_EQ(made[0], (kui::GraphWire { { "A", "out" }, { "B", "in" } }));
+    }
 }
 
 TEST_F(NodeTest, ACustomRuleDecidesWhatFits) {
@@ -3099,21 +3149,25 @@ namespace {
             const kui::Color image = kui::Color::Hex(0x4DB6AC), number = kui::Color::Hex(0xFFB74D), buffer = kui::Color::Hex(0x9575CD);
             g.comments.push_back({ .id = "c", .text = "Inputs", .rect = kui::Rect::XYWH(20.f, 20.f, 210.f, 330.f) });
             g.nodes.push_back({ .id = "tex", .title = "Image", .position = { 40.f, 60.f },
-                                .outputs = { { .id = "img", .label = "Image", .type = "image", .color = image } } });
+                                .outputs = { { .id = "img", .label = "Image", .type = "image", .color = image, .shape = kui::PortShape::eDiamond } } });
             g.nodes.push_back({ .id = "count", .title = "Particles", .position = { 40.f, 200.f },
                                 .outputs = { { .id = "n", .label = "Count", .type = "number", .color = number } },
-                                .body = kui::DragValue(4096.f, [](float) {}, { .label = "n" }) });
-            g.nodes.push_back({ .id = "blur", .title = "Blur (compute)", .position = { 300.f, 60.f },
-                                .inputs = { { .id = "src", .label = "Source", .type = "image", .color = image },
+                                .body = kui::DragValue(4096.f, [](float) {}, { .label = "n" }), .accent = kui::Color::Hex(0x5A8F3A) });
+            g.nodes.push_back({ .id = "blur", .title = "Blur (compute)", .icon = "functions", .position = { 300.f, 60.f },
+                                .inputs = { { .id = "src", .label = "Source", .type = "image", .color = image, .shape = kui::PortShape::eDiamond },
                                             { .id = "radius", .label = "Radius", .type = "number", .color = number } },
-                                .outputs = { { .id = "dst", .label = "Result", .type = "image", .color = image } },
-                                .accent = kui::Color::Hex(0x3A4A6B) });
+                                .outputs = { { .id = "dst", .label = "Result", .type = "image", .color = image, .shape = kui::PortShape::eDiamond } },
+                                .accent = kui::Color::Hex(0x3E9FA8) });
             g.nodes.push_back({ .id = "sim", .title = "Simulate", .position = { 300.f, 240.f },
                                 .inputs = { { .id = "count", .label = "Count", .type = "number", .color = number } },
-                                .outputs = { { .id = "state", .label = "State", .type = "buffer", .color = buffer } },
-                                .error = "no shader named 'simulate'" });
-            g.nodes.push_back({ .id = "out", .title = "Screen", .position = { 560.f, 120.f },
-                                .inputs = { { .id = "color", .label = "Color", .type = "image", .color = image } } });
+                                .outputs = { { .id = "state", .label = "State", .type = "buffer", .color = buffer, .shape = kui::PortShape::eSquare } },
+                                .accent = kui::Color::Hex(0xC2643B), .error = "no shader named 'simulate'" });
+            g.nodes.push_back({ .id = "out", .title = "Screen", .icon = "monitor", .position = { 560.f, 120.f },
+                                .inputs = { { .id = "color", .label = "Color", .type = "image", .color = image, .shape = kui::PortShape::eDiamond },
+                                            { .id = "exposure", .label = "Exposure", .type = "number", .color = number, .value = "1.0" },
+                                            { .id = "dither", .label = "Dither", .type = "bool", .control = kui::Checkbox(true, [](bool) {}) } } });
+            // A loop: a frame drawn as a node that holds the nodes it is round.
+            g.comments.push_back({ .id = "loop", .text = "Each frame", .color = kui::Color::Hex(0x5C6BC0), .around = { "sim" }, .container = true });
             g.wires = { { { "tex", "img" }, { "blur", "src" } }, { { "count", "n" }, { "blur", "radius" } },
                         { { "count", "n" }, { "sim", "count" } }, { { "blur", "dst" }, { "out", "color" } } };
             ui.SetRoot(kui::NodeEditor(std::move(g)));
@@ -3140,6 +3194,42 @@ TEST(NodeSheet, Renders) {
     for (int i = 0; i < 3; ++i) settle();
     const auto pixels = scene->readback->Read<kor::U8Vec4>(static_cast<std::size_t>(NodeSheetW) * NodeSheetH);
     stbi_write_png(out, NodeSheetW, NodeSheetH, 4, pixels.data(), NodeSheetW * 4);
+    s_app->Close(*scene);
+    settle();
+}
+
+namespace {
+    /** A theme in @p design's manner, coloured as its family colours things: what an application in that look would set. */
+    kui::Theme FamilyTheme(const kui::ThemeDesign design, const bool dark) { return kui::Theme::Of(design, dark); }
+}
+
+// The same graph in each design the controls come in, dark and light, each in its family's colours — the blur node picked, and the wire into the
+// screen — drawn to pictures to be looked at: set KUI_NODE_THEMES to where they go (a path, less "-<design>-<dark|light>.png").
+TEST(NodeSheet, RendersInEveryDesign) {
+    const char* out = std::getenv("KUI_NODE_THEMES");
+    if (!s_app || !out) GTEST_SKIP() << "set KUI_NODE_THEMES to a path prefix to render a node graph in every design";
+    auto* scene = s_app->OpenOffscreen<NodeSheetScene>({ .title = "nodes", .extent = { NodeSheetW, NodeSheetH }, .format = kor::Window::Format::eRGBA8_SRGB });
+    ASSERT_NE(scene, nullptr);
+    for (int i = 0; i < 3; ++i) settle();
+    const auto click = [&](const kor::Vec2 at, const bool shift) {
+        if (shift) { scene->SceneInput().FeedKey(kor::Key::eLeftShift, true); settle(); }
+        scene->SceneInput().FeedMousePosition(at); settle();
+        scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, true); settle();
+        scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, false); settle();
+        if (shift) { scene->SceneInput().FeedKey(kor::Key::eLeftShift, false); settle(); }
+    };
+    click({ 340.f, 70.f }, false);      // the blur node, by its title
+    click({ 500.f, 138.f }, true);      // and the wire from it to the screen, at its middle
+    scene->SceneInput().FeedMousePosition({ 740.f, 400.f });
+    const std::pair<const char*, kui::ThemeDesign> designs[] { { "koral", kui::ThemeDesign::eKoral }, { "material", kui::ThemeDesign::eMaterial },
+                                                              { "cupertino", kui::ThemeDesign::eCupertino }, { "fluent", kui::ThemeDesign::eFluent } };
+    for (const auto& [name, design] : designs)
+        for (const bool dark : { true, false }) {
+            scene->ui.SetTheme(FamilyTheme(design, dark));
+            for (int i = 0; i < 4; ++i) settle();
+            const auto pixels = scene->readback->Read<kor::U8Vec4>(static_cast<std::size_t>(NodeSheetW) * NodeSheetH);
+            stbi_write_png(std::format("{}-{}-{}.png", out, name, dark ? "dark" : "light").c_str(), NodeSheetW, NodeSheetH, 4, pixels.data(), NodeSheetW * 4);
+        }
     s_app->Close(*scene);
     settle();
 }

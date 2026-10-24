@@ -182,6 +182,10 @@ namespace kui
         {
             std::erase(Live(), this);
             for (auto* view : Live()) if (view->drag && view->drag->overUi == this) { view->drag->over = nullptr; view->drag->overUi = nullptr; }
+            // What is unmounted can close a popup as it goes (a PopupAnchor that was open): there is none to close by then.
+            owner.showPopup = nullptr;
+            owner.closePopup = nullptr;
+            owner.onPopupClosed = nullptr;
             overlayElement->Unmount();
             overlayElement.reset();
             element->Unmount();

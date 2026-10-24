@@ -6,6 +6,7 @@
 
 #include <kui/nodes.h>
 #include <kui/icons.h>
+#include <kui/text.h>
 
 #include <algorithm>
 #include <chrono>
@@ -17,6 +18,7 @@
 #include <input.h>
 
 #include "element.h"
+#include "glass.h"
 
 namespace kui
 {
@@ -32,6 +34,264 @@ namespace kui
         constexpr auto Twice = std::chrono::milliseconds(400);   // between two presses of a node that are one press twice
 
         Color Resolve(const Color color, const Color fallback) { return color.a < 0.f ? fallback : color; }
+        Color Mix(const Color a, const Color b, const float f)
+        {
+            return { a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f, a.a + (b.a - a.a) * f };
+        }
+        /** Text that can be read on @p ground: light on a dark one, dark on a light one. */
+        Color InkOn(const Color ground, const Theme& t)
+        {
+            const bool darkGround = 0.2126f * ground.r + 0.7152f * ground.g + 0.0722f * ground.b < 0.55f;
+            return darkGround == t.IsDark() ? t.text : darkGround ? Color::Hex(0xFAFAFA) : Color::Hex(0x1C1C1C);
+        }
+
+        // ---- how each design draws a node editor --------------------------------------------------------
+        //
+        // Only how things look: where a node's title, rows and ports are (kui::nodes) is the same in every design,
+        // so that a caller that places or hits against them need not know which it is in.
+
+        /** How round a node's card is. */
+        float CardRadius(const Theme& t)
+        {
+            switch (t.design) {
+            case ThemeDesign::eMaterial: return 12.f;      // a filled card's
+            case ThemeDesign::eCupertino: return 14.f;
+            case ThemeDesign::eFluent: return 6.f;         // between a control's and an overlay's
+            default: return 8.f;
+            }
+        }
+        float CommentRadius(const Theme& t)
+        {
+            switch (t.design) {
+            case ThemeDesign::eMaterial: return 16.f;
+            case ThemeDesign::eCupertino: return 18.f;
+            case ThemeDesign::eFluent: return 8.f;         // an overlay's
+            default: return 8.f;
+            }
+        }
+        /**
+         * A title bar of @p accent: the accent mixed into the card — how far, the design's; further when it is picked —
+         * never as bright as it is. Cupertino's is the tint its glass is painted with.
+         */
+        Color Tinted(const Color accent, const Theme& t, const bool picked = false)
+        {
+            switch (t.design) {
+            case ThemeDesign::eMaterial: return Mix(t.surface, accent, picked ? 0.42f : 0.30f);     // a tonal header
+            case ThemeDesign::eCupertino: return accent.WithAlpha(picked ? 0.62f : 0.46f);         // the glass's tint
+            case ThemeDesign::eFluent: return Mix(t.surface, accent, picked ? 0.32f : 0.22f);       // a subtle wash
+            default: return Mix(t.surface, accent, picked ? 0.62f : 0.48f);
+            }
+        }
+        /** What a title bar of @p bar looks like over the card: Cupertino's tint, laid over it. */
+        Color Seen(const Color bar, const Theme& t) { return t.design == ThemeDesign::eCupertino ? Mix(t.surface, bar.WithAlpha(1.f), bar.a) : bar; }
+        /** What a node's title bar is filled with: its accent, tinted (Tinted) — or what the design puts there when it has none (none: clear). */
+        Color TitleBar(const GraphNode& node, const Theme& t, const bool picked = false)
+        {
+            if (node.accent.a >= 0.f) return Tinted(node.accent, t, picked);
+            switch (t.design) {
+            case ThemeDesign::eMaterial: return Mix(t.surface, t.primary, t.IsDark() ? 0.16f : 0.12f);
+            case ThemeDesign::eCupertino: return colors::Transparent;
+            case ThemeDesign::eFluent: return Mix(t.surface, t.text, t.IsDark() ? 0.05f : 0.03f);
+            default: return t.surfaceHover;
+            }
+        }
+        /** The colour a node's title is written in, on its bar. */
+        Color TitleInk(const GraphNode& node, const Theme& t)
+        {
+            const Color bar = TitleBar(node, t);
+            return bar.Visible() ? InkOn(Seen(bar, t), t) : t.text;
+        }
+        TextStyle TitleStyle(const Theme& t)
+        {
+            TextStyle style = t.textStyle;
+            style.size = t.design == ThemeDesign::eMaterial ? 13.5f : t.design == ThemeDesign::eKoral ? 12.5f : 13.f;
+            style.weight = t.design == ThemeDesign::eMaterial ? 500.f : 600.f;
+            return style;
+        }
+        /** The words of a port's row: lighter than what is muted, as they are most of a card. */
+        Color LabelInk(const Theme& t) { return Mix(t.textMuted, t.text, 0.35f); }
+        /** What an input's field is filled with, and how round it is: a value set where a wire could go. */
+        Decoration FieldOf(const Theme& t)
+        {
+            const bool dark = t.IsDark();
+            switch (t.design) {
+            case ThemeDesign::eMaterial: return { .color = Mix(t.surface, t.text, dark ? 0.08f : 0.06f), .radius = Radii { 4.f, 4.f, 0.f, 0.f } };   // a filled field's top
+            case ThemeDesign::eCupertino: return { .color = t.text.WithAlpha(dark ? 0.09f : 0.06f), .radius = 9.f };                                  // a capsule
+            case ThemeDesign::eFluent:
+                return { .color = Mix(t.surface, t.text, dark ? 0.05f : 0.f), .borderWidth = 1.f, .borderColor = Mix(t.border, t.text, 0.10f), .radius = 4.f };
+            default: return { .color = Mix(t.surface, t.text, dark ? 0.08f : 0.06f), .radius = 4.f };
+            }
+        }
+
+        /** The cards under a composite node's: two more, a step down and to the right each, edged — a stack of what it is made of. */
+        void PaintStack(Canvas& canvas, const Rect& card, const Theme& t, const float pixel)
+        {
+            const float r = CardRadius(t);
+            for (const float step : { 14.f, 7.f }) {
+                const Rect under = card.Shift({ step, step });
+                canvas.DrawRRect({ under, r }, Paint::Fill(Mix(t.surface, t.text, step > 10.f ? 0.06f : 0.10f)));
+                canvas.DrawRRect({ under.Deflate(0.5f * pixel), r }, Paint::Stroked(Mix(t.border, t.text, 0.35f), 1.5f * pixel));
+            }
+        }
+
+        /** How abstract a node is, at its title bar's end: five steps, rising, as many lit as its level and one. */
+        void PaintLevel(Canvas& canvas, const GraphNode& node, const Rect& card, const Theme& t)
+        {
+            if (node.level < 0) return;
+            constexpr int Steps = 5;
+            constexpr float Width = 3.f, Gap = 2.f, Tallest = 12.f;
+            const float right = card.right - 8.f, bottom = card.top + TitleHeight * 0.5f + Tallest * 0.5f;
+            for (int i = 0; i < Steps; ++i) {
+                const float height = 4.f + (Tallest - 4.f) * static_cast<float>(i) / (Steps - 1);
+                const float left = right - (Steps - i) * (Width + Gap) + Gap;
+                const bool lit = i <= node.level;
+                canvas.DrawRRect({ Rect::LTRB(left, bottom - height, left + Width, bottom), 1.f },
+                                 Paint::Fill(lit ? t.text.WithAlpha(0.85f) : t.text.WithAlpha(0.18f)));
+            }
+        }
+
+        /** A node's card behind what it holds: its shadow, its body, its title bar and its edge. */
+        void PaintCard(Canvas& canvas, const GraphNode& node, const Rect& card, const Theme& t, const float pixel, const bool picked)
+        {
+            const float r = CardRadius(t);
+            const bool dark = t.IsDark();
+            const Color bar = TitleBar(node, t, picked);
+            const Rect title = Rect::LTRB(card.left, card.top, card.right, card.top + TitleHeight);
+            const Radii top { r, r, 0.f, 0.f };
+            switch (t.design) {
+            case ThemeDesign::eMaterial:
+                // A filled card, lifted a level: no edge, a header in the accent's tone.
+                canvas.DrawShadow({ card, r }, colors::Black.WithAlpha(dark ? 0.42f : 0.16f), 4.f, { 0.f, 1.f });
+                canvas.DrawShadow({ card, r }, colors::Black.WithAlpha(dark ? 0.22f : 0.08f), 10.f, { 0.f, 4.f });
+                canvas.DrawRRect({ card, r }, Paint::Fill(Mix(t.surface, t.primary, dark ? 0.04f : 0.02f)));
+                canvas.DrawRRect({ title, top }, Paint::Fill(bar));
+                break;
+            case ThemeDesign::eCupertino:
+                // Frosted glass: the surface, mostly, under a clear pane with a bright rim; an accent tints the
+                // title's own glass, and without one a hairline sets the title off.
+                canvas.DrawShadow({ card, r }, colors::Black.WithAlpha(dark ? 0.35f : 0.10f), 14.f, { 0.f, 6.f });
+                canvas.DrawRRect({ card, r }, Paint::Fill(t.surface.WithAlpha(dark ? 0.86f : 0.9f)));
+                detail::PaintGlass(canvas, t, { card, r }, colors::Transparent, dark ? -0.08f : -0.3f);
+                if (bar.Visible()) {
+                    canvas.Save();
+                    canvas.ClipRect(title);
+                    detail::PaintGlass(canvas, t, { card, r }, bar, 0.f, false);
+                    canvas.Restore();
+                } else {
+                    canvas.DrawLine({ card.left + 10.f, title.bottom }, { card.right - 10.f, title.bottom }, Paint::Stroked(t.text.WithAlpha(0.10f), pixel));
+                }
+                break;
+            case ThemeDesign::eFluent:
+                // A card: lifted a little off the ground, a thin edge that can be seen, a divider under its title.
+                canvas.DrawShadow({ card, r }, colors::Black.WithAlpha(dark ? 0.30f : 0.12f), 6.f, { 0.f, 2.f });
+                canvas.DrawRRect({ card, r }, Paint::Fill(Mix(t.surface, t.text, dark ? 0.03f : 0.f)));
+                canvas.DrawRRect({ title, top }, Paint::Fill(bar));
+                canvas.DrawLine({ card.left, title.bottom }, { card.right, title.bottom }, Paint::Stroked(Mix(t.border, t.text, 0.08f), pixel));
+                canvas.DrawRRect({ card, r }, Paint::Stroked(Mix(t.border, t.text, 0.12f), pixel));
+                break;
+            default:
+                // A dark card, well lifted, its edge a hairline — the accent's, picked — and its title bar tinted.
+                canvas.DrawShadow({ card, r }, colors::Black.WithAlpha(dark ? 0.5f : 0.14f), 16.f, { 0.f, 6.f });
+                canvas.DrawRRect({ card, r }, Paint::Fill(t.surface));
+                canvas.DrawRRect({ title, top }, Paint::Fill(bar));
+                canvas.DrawRRect({ card.Deflate(0.5f * pixel), r }, Paint::Stroked(picked ? t.primary : Mix(t.border, t.text, 0.04f), pixel));
+                break;
+            }
+        }
+
+        /** Round a node that is picked, or has an error: what says so. */
+        void PaintCardOutline(Canvas& canvas, const Rect& card, const Theme& t, const float pixel, const bool picked, const bool error)
+        {
+            const float r = CardRadius(t);
+            const Color color = error ? ErrorColor : t.primary;
+            switch (t.design) {
+            case ThemeDesign::eMaterial:
+                // Material's focus indicator: thick, and a little way off what it is round — and the accent's wash over it.
+                if (picked && !error) canvas.DrawRRect({ card, r }, Paint::Fill(t.primary.WithAlpha(0.08f)));
+                canvas.DrawRRect({ card.Inflate(3.5f * pixel), r + 3.5f * pixel }, Paint::Stroked(color, 3.f * pixel));
+                break;
+            case ThemeDesign::eCupertino:
+                // A soft ring of the accent, as round a field that has the keyboard.
+                canvas.DrawRRect({ card.Inflate(2.f * pixel), r + 2.f * pixel }, Paint::Stroked(color.WithAlpha(0.6f), 4.f * pixel));
+                break;
+            case ThemeDesign::eFluent:
+                // A thin line in the accent, and the accent's mark before the title, as before a chosen line.
+                canvas.DrawRRect({ card.Inflate(pixel), r + pixel }, Paint::Stroked(color, 2.f * pixel));
+                if (picked) canvas.DrawRRect({ Rect::XYWH(card.left + 3.f, card.top + TitleHeight * 0.5f - 7.f, 3.f, 14.f), 1.5f }, Paint::Fill(color));
+                break;
+            default:
+                // Its edge in the accent (PaintCard), a little stronger.
+                canvas.DrawRRect({ card.Inflate(0.5f * pixel), r + 0.5f * pixel }, Paint::Stroked(color, 1.5f * pixel));
+                break;
+            }
+        }
+
+        /** A port's mark, of @p shape, @p r across from its middle to its edge: a circle, a square, or a square on its point. */
+        void PaintMark(Canvas& canvas, const kor::Vec2 at, const PortShape shape, const float r, const Paint& paint)
+        {
+            switch (shape) {
+            case PortShape::eSquare: canvas.DrawRRect({ Rect::LTRB(at.x - r * 0.88f, at.y - r * 0.88f, at.x + r * 0.88f, at.y + r * 0.88f), 1.5f }, paint); break;
+            case PortShape::eDiamond: {
+                const float d = r * 1.18f;
+                const kor::Vec2 points[] { { at.x, at.y - d }, { at.x + d, at.y }, { at.x, at.y + d }, { at.x - d, at.y } };
+                canvas.DrawPath(Path().AddPolygon(points), paint);
+                break;
+            }
+            default: canvas.DrawCircle(at, r, paint); break;
+            }
+        }
+
+        /** A port's mark, at @p at in @p color and its shape: filled when something is wired to it. */
+        void PaintPort(Canvas& canvas, const kor::Vec2 at, const PortShape shape, const Color color, const bool wired, const Theme& t, const float pixel)
+        {
+            const Color ground = t.surface;
+            switch (t.design) {
+            case ThemeDesign::eMaterial:
+                // As a radio button: a thick ring, filled when on.
+                if (wired) PaintMark(canvas, at, shape, PortRadius, Paint::Fill(color));
+                else PaintMark(canvas, at, shape, PortRadius - 1.f, Paint::Fill(ground).SetStroke(2.f * pixel, color));
+                break;
+            case ThemeDesign::eCupertino:
+                // A drop of the colour with a bright rim, or a clear one.
+                PaintMark(canvas, at, shape, PortRadius, Paint::Fill(wired ? color : ground).SetStroke(1.5f * pixel, wired ? colors::White.WithAlpha(0.55f * color.a) : color));
+                break;
+            case ThemeDesign::eFluent:
+                // As Windows' radio button: the colour with a dot of the ground in it when on, a thin ring when not.
+                if (wired) {
+                    PaintMark(canvas, at, shape, PortRadius, Paint::Fill(color));
+                    PaintMark(canvas, at, shape, 2.f, Paint::Fill(ground));
+                } else {
+                    PaintMark(canvas, at, shape, PortRadius - 0.5f, Paint::Fill(ground).SetStroke(pixel, color));
+                }
+                break;
+            default:
+                // Wired, the colour ringed in the ground's dark, as a hole it is plugged into; not, a ring of it.
+                if (wired) PaintMark(canvas, at, shape, PortRadius, Paint::Fill(color).SetStroke(1.5f * pixel, t.IsDark() ? Mix(t.background, colors::Black, 0.5f) : t.surface));
+                else PaintMark(canvas, at, shape, PortRadius - 0.25f, Paint::Fill(ground).SetStroke(1.5f * pixel, color));
+                break;
+            }
+        }
+
+        /** How thick a wire is, in the graph's units. */
+        float WireWidth(const Theme& t)
+        {
+            switch (t.design) {
+            case ThemeDesign::eMaterial: return 3.f;
+            case ThemeDesign::eCupertino: return 2.f;
+            case ThemeDesign::eFluent: return 2.f;
+            default: return 2.f;
+            }
+        }
+        /** What a wire is drawn over, so that it reads over the grid and other wires: its shadow, of the design's own — or none. */
+        void PaintWireUnder(Canvas& canvas, const kor::Vec2 a, const kor::Vec2 b, const kor::Vec2 c, const kor::Vec2 d, const Theme& t, const float pixel)
+        {
+            const float width = WireWidth(t);
+            switch (t.design) {
+            case ThemeDesign::eKoral: canvas.DrawCubicBezier(a, b, c, d, Paint::Stroked(colors::Black.WithAlpha(t.IsDark() ? 0.55f : 0.14f), (width + 3.f) * pixel)); break;
+            case ThemeDesign::eCupertino: canvas.DrawCubicBezier(a, b, c, d, Paint::Stroked(colors::Black.WithAlpha(t.IsDark() ? 0.35f : 0.08f), (width + 4.f) * pixel)); break;
+            default: break;
+            }
+        }
 
         /** Distance from @p p to a cubic Bezier, by sampling: what picks a wire. */
         float DistanceToCubic(const kor::Vec2 p, const kor::Vec2 a, const kor::Vec2 b, const kor::Vec2 c, const kor::Vec2 d)
@@ -105,6 +365,7 @@ namespace kui
                     const float width = node.width > 0.f ? node.width : std::max(MinWidth, std::ceil(_children[i]->MinIntrinsicWidth()));
                     _children[i]->Layout(BoxConstraints { width, width, 0.f, kui::Infinity });
                     _children[i]->SetOffset(node.position);
+                    _view->sizes[node.id] = _children[i]->Size();
                 }
                 Settle();
             }
@@ -161,14 +422,15 @@ namespace kui
                     const auto& node = _config.graph.nodes[i];
                     const Rect card = Rect::XYWH(node.position.x, node.position.y, _children[i]->Size().x, _children[i]->Size().y).Shift(Shift(node.id));
                     if (card.Inflate(PortRadius + 12.f).Intersect(seen).Empty()) continue;
-                    canvas.DrawShadow({ card, 6.f }, colors::Black.WithAlpha(0.35f), 10.f, { 0.f, 3.f });
+                    const bool picked = _pickedNodes.contains(node.id);
+                    if (node.composite) PaintStack(canvas, card, t, pixel);
+                    PaintCard(canvas, node, card, t, pixel, picked);
                     // In the graph's own coordinates: the canvas is already where the view looks, so the child goes
                     // where its card is and nowhere further (PaintChild would add the view's pan and zoom, and the
                     // drag, a second time).
                     PaintChildAt(*_children[i], canvas, card.TopLeft());
-                    const bool picked = _pickedNodes.contains(node.id);
-                    if (!node.error.empty() || picked)
-                        canvas.DrawRRect({ card.Inflate(1.5f * pixel), 7.f }, Paint::Stroked(node.error.empty() ? t.primary : ErrorColor, 2.f * pixel));
+                    PaintLevel(canvas, node, card, t);
+                    if (!node.error.empty() || picked) PaintCardOutline(canvas, card, t, pixel, picked, !node.error.empty());
                     PaintPorts(canvas, node, card, t, pixel);
                 }
                 if (_drag == Drag::eWire) PaintLooseWire(canvas, t, pixel);
@@ -176,7 +438,21 @@ namespace kui
 
                 if (_drag == Drag::eBox) {
                     const Rect box = BoxRect().Shift(offset);
-                    canvas.DrawRect(box, Paint::Fill(t.primary.WithAlpha(0.12f)).SetStroke(1.f, t.primary.WithAlpha(0.8f)));
+                    switch (t.design) {
+                    case ThemeDesign::eMaterial:
+                        canvas.DrawRRect({ box, 4.f }, Paint::Fill(t.primary.WithAlpha(0.08f)).SetStroke(1.f, t.primary));
+                        break;
+                    case ThemeDesign::eCupertino:
+                        // The Mac's rubber band: grey, not the accent.
+                        canvas.DrawRect(box, Paint::Fill(t.text.WithAlpha(0.10f)).SetStroke(1.f, t.text.WithAlpha(0.45f)));
+                        break;
+                    case ThemeDesign::eFluent:
+                        canvas.DrawRect(box, Paint::Fill(t.primary.WithAlpha(0.22f)).SetStroke(1.f, t.primary));
+                        break;
+                    default:
+                        canvas.DrawRect(box, Paint::Fill(t.primary.WithAlpha(0.12f)).SetStroke(1.f, t.primary.WithAlpha(0.8f)));
+                        break;
+                    }
                 }
                 canvas.Restore();
             }
@@ -404,7 +680,7 @@ namespace kui
                     for (const bool output : { false, true }) {
                         const auto& ports = output ? it->outputs : it->inputs;
                         for (std::size_t i = 0; i < ports.size(); ++i)
-                            if (kor::Length(graph - (card.TopLeft() + PortOffset(output, i, card.Width()))) <= reach) return PortHit { &*it, output, i };
+                            if (kor::Length(graph - (card.TopLeft() + PortOffset(output, i, card.Width(), it->outputs.size()))) <= reach) return PortHit { &*it, output, i };
                     }
                 }
                 return std::nullopt;
@@ -418,7 +694,7 @@ namespace kui
                 const auto it = std::ranges::find(ports, ref.port, &NodePort::id);
                 if (it == ports.end()) return std::nullopt;
                 const Rect card = NodeRect(*node);
-                return card.TopLeft() + PortOffset(output, static_cast<std::size_t>(it - ports.begin()), card.Width());
+                return card.TopLeft() + PortOffset(output, static_cast<std::size_t>(it - ports.begin()), card.Width(), node->outputs.size());
             }
 
             [[nodiscard]] const NodePort* Port(const PortRef& ref, const bool output) const
@@ -707,18 +983,41 @@ namespace kui
                 const float grid = _config.options.gridSize;
                 if (grid <= 0.f) return;
                 const float step = grid * _view->zoom;
-                const Color minor = t.border.WithAlpha(0.35f), major = t.border.WithAlpha(0.9f);
-                const auto lines = [&](const float spacing, const Color color) {
+                const kor::Vec2 pan = Pan();
+                const auto first = [](const float p, const float spacing) { const float s = std::fmod(p, spacing); return s < 0.f ? s + spacing : s; };
+                const auto lines = [&](const float spacing, const Color color, const float width) {
                     if (spacing < 6.f) return;   // too dense to read
-                    const kor::Vec2 pan = Pan();
-                    const kor::Vec2 start = { std::fmod(pan.x, spacing), std::fmod(pan.y, spacing) };
-                    for (float x = start.x < 0.f ? start.x + spacing : start.x; x < Size().x; x += spacing)
-                        canvas.DrawLine(offset + kor::Vec2(x, 0.f), offset + kor::Vec2(x, Size().y), Paint::Stroked(color, 1.f));
-                    for (float y = start.y < 0.f ? start.y + spacing : start.y; y < Size().y; y += spacing)
-                        canvas.DrawLine(offset + kor::Vec2(0.f, y), offset + kor::Vec2(Size().x, y), Paint::Stroked(color, 1.f));
+                    for (float x = first(pan.x, spacing); x < Size().x; x += spacing)
+                        canvas.DrawLine(offset + kor::Vec2(x, 0.f), offset + kor::Vec2(x, Size().y), Paint::Stroked(color, width));
+                    for (float y = first(pan.y, spacing); y < Size().y; y += spacing)
+                        canvas.DrawLine(offset + kor::Vec2(0.f, y), offset + kor::Vec2(Size().x, y), Paint::Stroked(color, width));
                 };
-                lines(step, minor);
-                lines(step * 5.f, major);
+                // A dot where lines would cross, bigger every fifth: a page of dots, as Material's and Apple's canvases are.
+                const auto dots = [&](const float spacing, const Color color, const float radius) {
+                    if (spacing < 12.f) return;   // too dense to read, and too many to draw
+                    for (float x = first(pan.x, spacing); x < Size().x; x += spacing)
+                        for (float y = first(pan.y, spacing); y < Size().y; y += spacing) canvas.DrawCircle(offset + kor::Vec2(x, y), radius, Paint::Fill(color));
+                };
+                const float zoomed = std::clamp(_view->zoom, 0.6f, 1.4f);
+                switch (t.design) {
+                case ThemeDesign::eMaterial:
+                    dots(step, t.textMuted.WithAlpha(0.32f), 1.f * zoomed);
+                    dots(step * 5.f, t.textMuted.WithAlpha(0.55f), 1.6f * zoomed);
+                    break;
+                case ThemeDesign::eCupertino:
+                    dots(step, t.textMuted.WithAlpha(t.IsDark() ? 0.28f : 0.22f), 1.1f * zoomed);
+                    dots(step * 5.f, t.textMuted.WithAlpha(t.IsDark() ? 0.42f : 0.36f), 1.1f * zoomed);
+                    break;
+                case ThemeDesign::eFluent:
+                    // Windows' designers': fine lines, the fifth only a little stronger.
+                    lines(step, Mix(t.border, t.text, 0.02f).WithAlpha(0.45f), 1.f);
+                    lines(step * 5.f, Mix(t.border, t.text, 0.08f).WithAlpha(0.8f), 1.f);
+                    break;
+                default:
+                    lines(step, t.border.WithAlpha(0.35f), 1.f);
+                    lines(step * 5.f, t.border.WithAlpha(0.9f), 1.f);
+                    break;
+                }
             }
 
             void PaintComment(Canvas& canvas, const GraphComment& comment, const Theme& t, const float pixel) const
@@ -729,23 +1028,88 @@ namespace kui
                 if (_drag == Drag::eCommentResize && _comment == comment.id) r = ResizedComment();
                 const Color color = Resolve(comment.color, t.primary);
                 const bool picked = _pickedComments.contains(comment.id);
+                const float round = CommentRadius(t);
+                const Rect title = Rect::LTRB(r.left, r.top, r.right, r.top + CommentTitle);
+                const Radii top { round, round, 0.f, 0.f };
+                TextStyle text { .size = 14.f, .color = t.text };
+                if (t.design != ThemeDesign::eKoral) text.weight = 600.f;
+                if (t.design == ThemeDesign::eFluent) text.size = 13.f;
+                const auto edge = [&](const float width, const Color unpicked) {
+                    canvas.DrawRRect({ r, round }, Paint::Stroked(picked ? t.primary : unpicked, (picked ? width + 1.f : width) * pixel));
+                };
+                // Its title, in its title bar: one line, and what does not fit ends in an ellipsis rather than running out
+                // past its edge — a frame round a narrow node is narrower than what it says.
+                const auto caption = [&](const float down) {
+                    Paragraph line(comment.text, text, std::max(r.Width() - 20.f, 0.f));
+                    line.Truncate(1, true);
+                    canvas.DrawParagraph(line, { r.left + 10.f, r.top + down });
+                };
                 if (comment.container) {
-                    // A node of nodes: its body under them, its title bar in its colour, and its edge.
-                    canvas.DrawRRect({ r, 8.f }, Paint::Fill(t.surface.WithAlpha(0.72f)));
-                    canvas.DrawRRect({ r, 8.f }, Paint::Fill(color.WithAlpha(0.08f)));
-                    canvas.DrawRRect({ Rect::LTRB(r.left, r.top, r.right, r.top + CommentTitle), Radii { 8.f, 8.f, 0.f, 0.f } }, Paint::Fill(color.WithAlpha(0.85f)));
-                    canvas.DrawText(comment.text, { r.left + 10.f, r.top + 5.f }, { .size = 14.f, .color = t.text });
-                    canvas.DrawRRect({ r, 8.f }, Paint::Stroked(picked ? t.primary : color.WithAlpha(0.9f), (picked ? 2.5f : 1.5f) * pixel));
+                    // A node of nodes: its body under them, its title bar tinted with its colour as a node's is, and its edge.
+                    const Color bar = Tinted(color, t);
+                    text.color = InkOn(Seen(bar, t), t);
+                    switch (t.design) {
+                    case ThemeDesign::eMaterial:
+                        canvas.DrawRRect({ r, round }, Paint::Fill(Mix(t.surface, color, 0.10f).WithAlpha(0.8f)));
+                        canvas.DrawRRect({ title, top }, Paint::Fill(bar));
+                        if (picked) edge(2.f, colors::Transparent);
+                        break;
+                    case ThemeDesign::eCupertino:
+                        canvas.DrawRRect({ r, round }, Paint::Fill(Mix(t.surface, color, 0.08f).WithAlpha(0.6f)));
+                        detail::PaintGlass(canvas, t, { r, round }, colors::Transparent, t.IsDark() ? -0.12f : -0.45f, false);
+                        canvas.Save();
+                        canvas.ClipRect(title);
+                        detail::PaintGlass(canvas, t, { r, round }, bar, 0.f, false);
+                        canvas.Restore();
+                        if (picked) canvas.DrawRRect({ r.Inflate(2.f * pixel), round + 2.f * pixel }, Paint::Stroked(t.primary.WithAlpha(0.6f), 4.f * pixel));
+                        break;
+                    case ThemeDesign::eFluent:
+                        canvas.DrawRRect({ r, round }, Paint::Fill(Mix(t.surface, color, 0.06f).WithAlpha(0.75f)));
+                        canvas.DrawRRect({ title, top }, Paint::Fill(bar));
+                        edge(1.f, Mix(t.border, color, 0.5f));
+                        break;
+                    default:
+                        canvas.DrawRRect({ r, round }, Paint::Fill(t.surface.WithAlpha(0.72f)));
+                        canvas.DrawRRect({ r, round }, Paint::Fill(color.WithAlpha(0.08f)));
+                        canvas.DrawRRect({ title, top }, Paint::Fill(bar));
+                        edge(1.5f, color.WithAlpha(0.9f));
+                        break;
+                    }
+                    caption(5.f);
                     return;
                 }
-                canvas.DrawRRect({ r, 8.f }, Paint::Fill(color.WithAlpha(0.03f)));
-                canvas.DrawRRect({ Rect::LTRB(r.left, r.top, r.right, r.top + CommentTitle), Radii { 8.f, 8.f, 0.f, 0.f } }, Paint::Fill(color.WithAlpha(0.22f)));
-                canvas.DrawText(comment.text, { r.left + 10.f, r.top + 4.f }, { .size = 14.f, .color = t.text });
-                canvas.DrawRRect({ r, 8.f }, Paint::Stroked(picked ? t.primary : color.WithAlpha(0.5f), (picked ? 2.f : 1.f) * pixel));
+                switch (t.design) {
+                case ThemeDesign::eMaterial:
+                    // A tonal container, no edge but what says it is picked.
+                    canvas.DrawRRect({ r, round }, Paint::Fill(color.WithAlpha(0.10f)));
+                    if (picked) edge(1.f, colors::Transparent);
+                    break;
+                case ThemeDesign::eCupertino:
+                    canvas.DrawRRect({ r, round }, Paint::Fill(color.WithAlpha(0.08f)));
+                    canvas.DrawRRect({ r.Deflate(0.5f * pixel), round }, Paint::Stroked(colors::White.WithAlpha(t.IsDark() ? 0.10f : 0.6f), pixel));
+                    if (picked) canvas.DrawRRect({ r.Inflate(2.f * pixel), round + 2.f * pixel }, Paint::Stroked(t.primary.WithAlpha(0.6f), 4.f * pixel));
+                    break;
+                case ThemeDesign::eFluent:
+                    canvas.DrawRRect({ r, round }, Paint::Fill(color.WithAlpha(0.05f)));
+                    canvas.DrawRRect({ title, top }, Paint::Fill(color.WithAlpha(0.16f)));
+                    canvas.DrawLine({ r.left, title.bottom }, { r.right, title.bottom }, Paint::Stroked(color.WithAlpha(0.35f), pixel));
+                    edge(1.f, color.WithAlpha(0.45f));
+                    break;
+                default:
+                    // Its colour only mixed into the ground, as a node's title bar is into its card: never a wash of it.
+                    canvas.DrawRRect({ r, round }, Paint::Fill(Mix(t.background, color, 0.05f)));
+                    canvas.DrawRRect({ title, top }, Paint::Fill(Mix(t.background, color, 0.22f)));
+                    edge(1.f, Mix(t.border, color, 0.45f));
+                    break;
+                }
+                caption(4.f);
                 // The corner that resizes it.
                 if (!comment.around.empty()) return;
-                const kor::Vec2 c { r.right - 4.f, r.bottom - 4.f };
+                const float inset = t.design == ThemeDesign::eKoral ? 4.f : 4.f + round * 0.3f;   // clear of a rounder corner
+                const kor::Vec2 c { r.right - inset, r.bottom - inset };
                 canvas.DrawLine(c - kor::Vec2(8.f, 0.f), c - kor::Vec2(0.f, 8.f), Paint::Stroked(color.WithAlpha(0.7f), 1.5f * pixel));
+                if (t.design != ThemeDesign::eKoral)
+                    canvas.DrawLine(c - kor::Vec2(4.f, 0.f), c - kor::Vec2(0.f, 4.f), Paint::Stroked(color.WithAlpha(0.7f), 1.5f * pixel));
             }
 
             void PaintWire(Canvas& canvas, const GraphWire& wire, const Theme& t, const float pixel, const Rect& seen) const
@@ -764,8 +1128,18 @@ namespace kui
                 const Color color = Resolve(port ? port->color : colors::Inherit, t.primary);
                 const bool picked = _pickedWires.contains(wire);
                 const auto [c1, c2] = WireControls(*from, *to);
-                if (picked) canvas.DrawCubicBezier(*from, c1, c2, *to, Paint::Stroked(t.text.WithAlpha(0.5f), 6.f * pixel));
-                canvas.DrawCubicBezier(*from, c1, c2, *to, Paint::Stroked(color, 2.5f * pixel));
+                const float width = WireWidth(t);
+                PaintWireUnder(canvas, *from, c1, c2, *to, t, pixel);
+                if (picked) {
+                    // What says a wire is picked: a halo, of the design's own.
+                    switch (t.design) {
+                    case ThemeDesign::eMaterial: canvas.DrawCubicBezier(*from, c1, c2, *to, Paint::Stroked(t.primary.WithAlpha(0.32f), (width + 7.f) * pixel)); break;
+                    case ThemeDesign::eCupertino: canvas.DrawCubicBezier(*from, c1, c2, *to, Paint::Stroked(t.primary.WithAlpha(0.45f), (width + 5.f) * pixel)); break;
+                    case ThemeDesign::eFluent: canvas.DrawCubicBezier(*from, c1, c2, *to, Paint::Stroked(t.primary, (width + 3.f) * pixel)); break;
+                    default: canvas.DrawCubicBezier(*from, c1, c2, *to, Paint::Stroked(t.text.WithAlpha(0.5f), 6.f * pixel)); break;
+                    }
+                }
+                canvas.DrawCubicBezier(*from, c1, c2, *to, Paint::Stroked(color, width * pixel));
             }
 
             void PaintLooseWire(Canvas& canvas, const Theme& t, const float pixel) const
@@ -776,7 +1150,8 @@ namespace kui
                 const Color color = Resolve(port ? port->color : colors::Inherit, t.primary);
                 const kor::Vec2 from = _wireFromOutput ? *anchor : _wireTo, to = _wireFromOutput ? _wireTo : *anchor;
                 const auto [c1, c2] = WireControls(from, to);
-                canvas.DrawCubicBezier(from, c1, c2, to, Paint::Stroked(color.WithAlpha(0.8f), 2.5f * pixel));
+                PaintWireUnder(canvas, from, c1, c2, to, t, pixel);
+                canvas.DrawCubicBezier(from, c1, c2, to, Paint::Stroked(color.WithAlpha(0.8f), WireWidth(t) * pixel));
             }
 
             void PaintPorts(Canvas& canvas, const GraphNode& node, const Rect& card, const Theme& t, const float pixel) const
@@ -786,7 +1161,7 @@ namespace kui
                     const auto& ports = output ? node.outputs : node.inputs;
                     for (std::size_t i = 0; i < ports.size(); ++i) {
                         const auto& port = ports[i];
-                        const kor::Vec2 at = card.TopLeft() + PortOffset(output, i, card.Width());
+                        const kor::Vec2 at = card.TopLeft() + PortOffset(output, i, card.Width(), node.outputs.size());
                         Color color = Resolve(port.color, t.primary);
                         // While a wire is drawn, what it cannot go to fades.
                         if (dragged && (output == _wireFromOutput || !(output ? Fits(port, *dragged) : Fits(*dragged, port))))
@@ -794,7 +1169,7 @@ namespace kui
                         const bool wired = std::ranges::any_of(_config.graph.wires, [&](const GraphWire& w) {
                             return output ? w.from == PortRef { node.id, port.id } : w.to == PortRef { node.id, port.id };
                         });
-                        canvas.DrawCircle(at, PortRadius, Paint::Fill(wired ? color : t.surface).SetStroke(1.5f * pixel, color));
+                        PaintPort(canvas, at, port.shape, color, wired, t, pixel);
                     }
                 }
             }
@@ -834,57 +1209,66 @@ namespace kui
             [[nodiscard]] const std::vector<Widget>& Children() const override { return cards; }
         };
 
-        /** A node's card: its title, a row a port pair, and its own controls under them. */
-        Widget Card(const GraphNode& node)
+        /**
+         * A node's card: its title, a row a port — its outputs, then its inputs — and its own controls under them. What
+         * it is drawn on — its body, its title bar, its edge — is the editor's to paint (PaintCard), as the theme's design
+         * has it.
+         */
+        Widget BuildCard(const GraphNode& node)
         {
             const Theme& t = Theme::Current();
-            TextStyle title = t.textStyle;
-            title.size = 13.f;
-            title.weight = 600.f;
+            TextStyle title = TitleStyle(t);
+            title.color = TitleInk(node, t);
             TextStyle label = t.textStyle;
             label.size = 12.f;
-            label.color = t.textMuted;
+            label.color = LabelInk(t);
+            const auto row = [](Widget content) {
+                return Container({ .height = RowHeight, .padding = EdgeInsets::Symmetric(10.f, 0.f) }, std::move(content));
+            };
 
             std::vector<Widget> rows;
-            rows.push_back(Container({ .height = TitleHeight, .padding = EdgeInsets::Symmetric(10.f, 0.f),
-                                       .decoration = { .color = Resolve(node.accent, t.surfaceHover), .radius = Radii { 6.f, 6.f, 0.f, 0.f } } },
+            // Room at the title's end for its level's steps (PaintLevel), when it shows them.
+            rows.push_back(Container({ .height = TitleHeight, .padding = EdgeInsets::Only(10.f, 0.f, node.level >= 0 ? 38.f : 10.f, 0.f) },
                                      Align(Alignment::CenterLeft(), [&]() -> Widget {
                                          Widget text = Text(node.title, title, TextAlign::eStart, false);
                                          const auto icon = node.icon.empty() ? nullptr : MaterialIcon(node.icon);
                                          if (!icon) return text;
-                                         return Row({ SizedBox(15.f, 15.f, Icon(icon, title.color.a < 0.f ? t.text : title.color)), std::move(text) }, FlexOptions { .gap = 6.f });
+                                         return Row({ SizedBox(14.f, 14.f, Icon(icon, title.color)), std::move(text) }, FlexOptions { .crossAxisAlignment = CrossAxisAlignment::eCenter, .gap = 7.f });
                                      }())));
-            const std::size_t count = std::max(node.inputs.size(), node.outputs.size());
+            const std::size_t count = node.inputs.size() + node.outputs.size();
             if (count > 0) rows.push_back(SizedBox(0.f, PortsTop));
-            for (std::size_t i = 0; i < count; ++i) {
-                Widget in = SizedBox(0.f, 0.f);
-                if (i < node.inputs.size()) {
-                    const NodePort& port = node.inputs[i];
-                    in = Text(port.label, label, TextAlign::eStart, false);
-                    if (port.control) {
-                        in = Row({ std::move(in), port.control }, { .crossAxisAlignment = CrossAxisAlignment::eCenter, .gap = 8.f });
-                    } else if (!port.value.empty()) {
-                        TextStyle given = label;
-                        given.color = t.textMuted.WithAlpha(0.65f);
-                        in = Row({ std::move(in), Text(port.value, given, TextAlign::eStart, false) }, { .crossAxisAlignment = CrossAxisAlignment::eCenter, .gap = 6.f });
-                    }
+            // What it gives, at its right edge, each its own row; then what it takes, at its left.
+            for (const NodePort& port : node.outputs)
+                rows.push_back(row(Align(Alignment::CenterRight(), Text(port.label, label, TextAlign::eEnd, false))));
+            for (const NodePort& port : node.inputs) {
+                if (port.control) {
+                    rows.push_back(row(Row({ Text(port.label, label, TextAlign::eStart, false), SizedBox(12.f, 0.f).Expanded(), port.control },
+                                           { .crossAxisAlignment = CrossAxisAlignment::eCenter })));
+                } else if (!port.value.empty()) {
+                    // A value set where a wire could go: a field across the row, what it is at one end and what it is set to at the other.
+                    TextStyle name = label;
+                    name.color = t.textMuted;
+                    TextStyle given = label;
+                    given.color = t.text;
+                    rows.push_back(row(Container({ .padding = EdgeInsets::Symmetric(8.f, 0.f), .margin = EdgeInsets::Symmetric(0.f, 3.f), .decoration = FieldOf(t) },
+                        Row({ Text(port.label, name, TextAlign::eStart, false), SizedBox(12.f, 0.f).Expanded(), Text(port.value, given, TextAlign::eEnd, false) },
+                            { .crossAxisAlignment = CrossAxisAlignment::eCenter }))));
+                } else {
+                    rows.push_back(row(Align(Alignment::CenterLeft(), Text(port.label, label, TextAlign::eStart, false))));
                 }
-                Widget out = i < node.outputs.size() ? Text(node.outputs[i].label, label, TextAlign::eEnd, false) : SizedBox(0.f, 0.f);
-                rows.push_back(Container({ .height = RowHeight, .padding = EdgeInsets::Symmetric(14.f, 0.f) },
-                                         Row({ std::move(in), SizedBox(20.f, 0.f).Expanded(), std::move(out) },
-                                             { .crossAxisAlignment = CrossAxisAlignment::eCenter })));
             }
-            if (node.body) rows.push_back(node.body.Padding(EdgeInsets { 12.f, count > 0 ? 4.f : 10.f, 12.f, 12.f }));
+            if (node.body) rows.push_back(node.body.Padding(EdgeInsets { 10.f, count > 0 ? 4.f : 8.f, 10.f, 10.f }));
             if (!node.error.empty()) {
                 TextStyle error = label;
                 error.color = ErrorColor;
                 rows.push_back(Text(node.error, error).Padding(EdgeInsets::Symmetric(10.f, 6.f)));
             }
-            if (rows.size() == 1) rows.push_back(SizedBox(0.f, 6.f));
-            return Container({ .decoration = { .color = t.surface, .borderWidth = 1.f, .borderColor = t.border, .radius = 6.f } },
-                             Column(std::move(rows), { .crossAxisAlignment = CrossAxisAlignment::eStretch, .mainAxisSize = MainAxisSize::eMin }))
-                .Key(node.id);
+            rows.push_back(SizedBox(0.f, node.body ? 0.f : 6.f));
+            return Column(std::move(rows), { .crossAxisAlignment = CrossAxisAlignment::eStretch, .mainAxisSize = MainAxisSize::eMin });
         }
+
+        /** A node's card, built where it is in the tree, so that it is in the theme set there. */
+        Widget Card(const GraphNode& node) { return detail::Deferred([node] { return BuildCard(node); }).Key(node.id); }
     }
 
     void NodeEditorView::Frame()

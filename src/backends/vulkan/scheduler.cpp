@@ -8,6 +8,7 @@
 #include "commandBuffer.h"
 #include "log.h"
 #include "timeline.h"
+#include "gpuDiagnostics.h"
 #include "../../core/tokenState.h"
 #include <framebuffer.h>
 #include <surface.h>
@@ -40,6 +41,7 @@ namespace kor::vk
         // stops responding with nothing logged.
         [[noreturn]] void reportDeviceLost(const char* where)
         {
+            diag::Report(where);
             kor::log::Error("[vulkan] device lost during {} — the GPU stopped responding (driver "
                             "reset / TDR, or a command the driver refused). Unrecoverable; aborting.",
                             where);
@@ -123,6 +125,7 @@ namespace kor::vk
         // frame expects to find.
         if (_drawnOnce) AdvanceFrame();
         _drawnOnce = true;
+        diag::NoteFrame();
         const auto& frame = dynamic_cast<const kor::vk::Frame&>(CurrentFrame());
         const kor::u32 slot = frame.ImageIndex();
 

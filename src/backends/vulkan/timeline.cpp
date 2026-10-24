@@ -9,6 +9,7 @@
 #include "device.h"
 #include "log.h"
 #include "vulkanContext.h"
+#include "gpuDiagnostics.h"
 #include "../../core/tokenState.h"
 
 namespace {
@@ -50,8 +51,14 @@ namespace {
         }
 
         void wait(const std::uint64_t value) override {
-            const auto result = kor::vk::Context::Device()->waitSemaphores(
-                ::vk::SemaphoreWaitInfo().setSemaphores(_semaphore).setValues(value), Forever);
+            ::vk::Result result;
+            try {
+                result = kor::vk::Context::Device()->waitSemaphores(
+                    ::vk::SemaphoreWaitInfo().setSemaphores(_semaphore).setValues(value), Forever);
+            } catch (const ::vk::DeviceLostError&) {
+                kor::vk::diag::Report("token wait");
+                throw;
+            }
             if (result != ::vk::Result::eSuccess)
                 kor::log::Error("Waiting for a token failed: {}", ::vk::to_string(result));
         }
@@ -146,10 +153,16 @@ namespace kor::vk {
                 }
             }
 
-            const auto result = Context::Device()->waitSemaphores(::vk::SemaphoreWaitInfo()
-                .setFlags(::vk::SemaphoreWaitFlagBits::eAny)
-                .setSemaphores(semaphores)
-                .setValues(values), Forever);
+            ::vk::Result result;
+            try {
+                result = Context::Device()->waitSemaphores(::vk::SemaphoreWaitInfo()
+                    .setFlags(::vk::SemaphoreWaitFlagBits::eAny)
+                    .setSemaphores(semaphores)
+                    .setValues(values), Forever);
+            } catch (const ::vk::DeviceLostError&) {
+                diag::Report("token reactor wait");
+                throw;
+            }
             if (result != ::vk::Result::eSuccess) {
                 log::Error("The token reactor's wait failed ({}); GPU-signalled tokens will no longer "
                            "resume their coroutines", ::vk::to_string(result));

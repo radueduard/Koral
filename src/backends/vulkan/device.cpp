@@ -10,6 +10,7 @@
 #include "log.h"
 #include "../../core/tokenState.h"
 #include "timeline.h"
+#include "gpuDiagnostics.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -351,6 +352,28 @@ namespace kor::vk {
         _supportsPresentFences = supportedSwapchainMaintenance.swapchainMaintenance1;
         auto swapchainMaintenanceFeatures = ::vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR().setSwapchainMaintenance1(true);
         if (_supportsPresentFences) chainIn(swapchainMaintenanceFeatures);
+        // KORAL_GPU_DIAGNOSTICS: what a lost device died on. @see gpuDiagnostics.h
+        const bool faultReport = diag::Enabled() && physicalDevice.supportsExtension(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
+        const bool bindingReport = diag::Enabled() && physicalDevice.supportsExtension(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME);
+        const bool checkpoints = diag::Enabled() && physicalDevice.supportsExtension(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME)
+            && physicalDevice.supportsExtension(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME);
+        auto faultFeatures = ::vk::PhysicalDeviceFaultFeaturesEXT().setDeviceFault(true);
+        auto bindingReportFeatures = ::vk::PhysicalDeviceAddressBindingReportFeaturesEXT().setReportAddressBinding(true);
+        auto diagnosticsConfigFeatures = ::vk::PhysicalDeviceDiagnosticsConfigFeaturesNV().setDiagnosticsConfig(true);
+        auto diagnosticsConfig = ::vk::DeviceDiagnosticsConfigCreateInfoNV().setFlags(
+            ::vk::DeviceDiagnosticsConfigFlagBitsNV::eEnableShaderDebugInfo
+            | ::vk::DeviceDiagnosticsConfigFlagBitsNV::eEnableResourceTracking
+            | ::vk::DeviceDiagnosticsConfigFlagBitsNV::eEnableShaderErrorReporting);
+        if (faultReport) chainIn(faultFeatures);
+        if (bindingReport) chainIn(bindingReportFeatures);
+        if (checkpoints) {
+            chainIn(diagnosticsConfigFeatures);
+            chainIn(diagnosticsConfig);
+        }
+        if (diag::Enabled()) {
+            kor::log::Info("[gpu-diag] on: device fault {}, address binding report {}, checkpoints {}", faultReport, bindingReport, checkpoints);
+            diag::ReportOnTerminate();
+        }
         _enabledFeatures = enabled;
         detail::SetDeviceFeatures(available, enabled);
 
@@ -398,6 +421,12 @@ namespace kor::vk {
             deviceExtensions.push_back(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
             deviceExtensions.push_back(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
         }
+        if (faultReport) deviceExtensions.push_back(VK_EXT_DEVICE_FAULT_EXTENSION_NAME);
+        if (bindingReport) deviceExtensions.push_back(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME);
+        if (checkpoints) {
+            deviceExtensions.push_back(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME);
+            deviceExtensions.push_back(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME);
+        }
 
         _supportsRayTracing = physicalDevice.supportsExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
             && physicalDevice.supportsExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
@@ -436,11 +465,16 @@ namespace kor::vk {
     void Device::queuesWaitIdle() const {
         std::lock_guard queues(_queuesMutex);
         const auto lock = lockQueues();
-        for (const auto& queue : _queuesInUse)
-        {
-            queue->operator*().waitIdle();
+        try {
+            for (const auto& queue : _queuesInUse)
+            {
+                queue->operator*().waitIdle();
+            }
+            if (_asyncComputeQueue) (**_asyncComputeQueue).waitIdle();
+        } catch (const ::vk::DeviceLostError&) {
+            diag::Report("queue wait idle");
+            throw;
         }
-        if (_asyncComputeQueue) (**_asyncComputeQueue).waitIdle();
     }
 
     std::pair<::vk::Semaphore, std::uint64_t> Device::nextEpoch(const Queue& queue) const {
@@ -472,7 +506,12 @@ namespace kor::vk {
 
     void Device::waitIdle() const {
         const auto lock = lockQueues();
-        _handle.waitIdle();
+        try {
+            _handle.waitIdle();
+        } catch (const ::vk::DeviceLostError&) {
+            diag::Report("device wait idle");
+            throw;
+        }
     }
 
     const Queue& Device::requestQueue(const ::vk::QueueFlags type) const {
@@ -530,6 +569,13 @@ namespace kor::vk {
             // Neither: async compute runs on the frame's queue, in order.
         }
         return _asyncComputeQueue ? *_asyncComputeQueue : frame;
+    }
+
+    std::vector<::vk::Queue> Device::queuesForDiagnostics() const {
+        std::vector<::vk::Queue> queues;
+        for (const auto& queue : _queuesInUse) queues.push_back(**queue);
+        if (_asyncComputeQueue) queues.push_back(**_asyncComputeQueue);
+        return queues;
     }
 
     std::vector<kor::u32> Device::sharedFamilies() const {

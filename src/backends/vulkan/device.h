@@ -114,6 +114,8 @@ namespace kor::vk {
         // The two families a resource used by both queues is shared between, when the async compute
         // queue is of a family of its own; empty when it is not (and exclusive sharing is right).
         [[nodiscard]] std::vector<kor::u32> sharedFamilies() const;
+        // Every queue handed out, for reading back what each reached when the device was lost. @see gpuDiagnostics.h
+        [[nodiscard]] std::vector<::vk::Queue> queuesForDiagnostics() const;
         void freeQueues() const;
 
         // A command buffer with a pool of its own, from a free list. A pool may only be used by one

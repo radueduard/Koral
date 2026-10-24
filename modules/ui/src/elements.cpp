@@ -3,6 +3,8 @@
 //
 
 #include <algorithm>
+#include <cstdint>
+#include <initializer_list>
 #include <map>
 #include <typeinfo>
 
@@ -90,6 +92,38 @@ namespace kui
         t.textMuted = Color::Hex(0x7A7A7A);
         t.border = Color::Hex(0xE0E0E0);
         t.focus = Color::Hex(0xE86A3C);
+        return t;
+    }
+
+    Theme Theme::Of(const ThemeDesign design, const bool dark)
+    {
+        Theme t = dark ? Dark() : Light();
+        t.design = design;
+        const auto set = [&](std::initializer_list<std::uint32_t> c) {
+            const auto* v = c.begin();
+            t.background = Color::Hex(v[0]); t.surface = Color::Hex(v[1]); t.surfaceHover = Color::Hex(v[2]);
+            t.surfacePressed = Color::Hex(v[3]); t.primary = Color::Hex(v[4]); t.primaryHover = Color::Hex(v[5]);
+            t.primaryPressed = Color::Hex(v[6]); t.onPrimary = Color::Hex(v[7]); t.text = Color::Hex(v[8]);
+            t.textMuted = Color::Hex(v[9]); t.border = Color::Hex(v[10]); t.focus = t.primary;
+        };
+        switch (design) {
+        case ThemeDesign::eMaterial:        // Material 3's baseline scheme
+            if (dark) set({ 0x141218, 0x211F26, 0x2B2930, 0x36343B, 0xD0BCFF, 0xDCCBFF, 0xC2ADF5, 0x381E72, 0xE6E0E9, 0xCAC4D0, 0x49454F });
+            else set({ 0xFEF7FF, 0xF3EDF7, 0xECE6F0, 0xE6E0E9, 0x6750A4, 0x7965AF, 0x5A4596, 0xFFFFFF, 0x1D1B20, 0x49454F, 0xCAC4D0 });
+            t.radius = 20.f; t.fieldRadius = 4.f;
+            break;
+        case ThemeDesign::eCupertino:       // Apple's system colours
+            if (dark) set({ 0x000000, 0x1C1C1E, 0x2C2C2E, 0x3A3A3C, 0x0A84FF, 0x409CFF, 0x0071E3, 0xFFFFFF, 0xFFFFFF, 0x8E8E93, 0x38383A });
+            else set({ 0xF2F2F7, 0xFFFFFF, 0xE5E5EA, 0xD1D1D6, 0x007AFF, 0x3395FF, 0x0062CC, 0xFFFFFF, 0x000000, 0x8E8E93, 0xC6C6C8 });
+            t.radius = 10.f;
+            break;
+        case ThemeDesign::eFluent:          // Windows 11's, with its default accent
+            if (dark) set({ 0x202020, 0x2D2D2D, 0x323232, 0x272727, 0x60CDFF, 0x5AB8E6, 0x529FC7, 0x000000, 0xFFFFFF, 0xC5C5C5, 0x3A3A3A });
+            else set({ 0xF3F3F3, 0xFBFBFB, 0xF6F6F6, 0xF0F0F0, 0x005FB8, 0x1A6FC0, 0x2A7AC6, 0xFFFFFF, 0x1A1A1A, 0x5D5D5D, 0xE5E5E5 });
+            t.radius = 4.f;
+            break;
+        case ThemeDesign::eKoral: break;
+        }
         return t;
     }
 

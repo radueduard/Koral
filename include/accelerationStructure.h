@@ -67,6 +67,11 @@ namespace kor
             kor::Mat4 transform = kor::Mat4(1.0f);           ///< Where it sits in world space.
             kor::u32 instanceCustomIndex = 0;   ///< Available to shaders as gl_InstanceCustomIndexEXT.
             kor::u32 hitGroupIndex = 0;         ///< SBT hit-group record offset for this instance.
+            /// Whether its triangles are taken as opaque, whatever its geometry says: false has an any-hit shader run
+            /// for each (an alpha test), true has none run — what most of a scene is.
+            bool opaque = true;
+            /// Which rays see it: a ray traced with an inclusion mask sees an instance whose mask shares a bit with it.
+            kor::u8 mask = 0xFF;
         };
 
         /**

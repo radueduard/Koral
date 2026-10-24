@@ -22,6 +22,7 @@
 #include "framebuffer.h"
 #include "graphicsPipeline.h"
 #include "image.h"
+#include "log.h"
 #include "imageView.h"
 #include "mesh.h"
 #include <koralMesh.h>
@@ -1848,4 +1849,47 @@ TEST_F(GpuTest, AnImageWithNoUsageOrNoSizeIsRefusedNotMade) {
     const auto source = kor::Image::Builder{}.SetFormat(kor::Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2{ 8, 8 })
         .SetUsage(kor::Image::Usage::eTransferSrc).Build();
     EXPECT_TRUE(source.Valid()) << (source.Failure() ? source.Failure()->message : "");
+}
+
+// A fragment shader whose `uniform`s are the vertex shader's and one more: the pipeline's push-constant range is as
+// long as the longer of the two, so the colour after the matrix is pushed inside it — and is what is drawn.
+TEST_F(GpuTest, APushConstantRangeIsAsLongAsTheStageThatReadsTheMostOfIt) {
+    Image::Builder ib;
+    ib.SetType(Image::Type::e2D)
+      .SetFormat(Image::Format::eRGBA8_UNORM)
+      .SetExtent(kor::UVec2{kW, kH})
+      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc);
+    auto colorImage = ib.Build();
+    auto colorView = ImageView::Builder(colorImage).Build();
+    auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} }).Build();
+
+    kor::Shader::AddSearchPath(KORAL_TEST_SHADERS_DIR);
+    const ResourceRef<const kor::Shader> vert = kor::Shader::Builder{}.SetEntryPoint("stagePush", "vertex").GetOrBuild();
+    const ResourceRef<const kor::Shader> frag = kor::Shader::Builder{}.SetEntryPoint("stagePush", "fragment").GetOrBuild();
+    ASSERT_TRUE(vert.Valid() && frag.Valid());
+    auto pipeline = GraphicsPipeline::Builder{}.SetVertexShader(vert).SetFragmentShader(frag).SetFramebuffer(framebuffer).Build();
+    ASSERT_TRUE(pipeline.Valid()) << pipeline.Failure()->History();
+    EXPECT_EQ(pipeline->PushConstantEnd(), 76u) << "a matrix, and the fragment shader's colour after it";
+    EXPECT_EQ(pipeline->PushConstantRange(64).size, 76u) << "one range, covering the colour too";
+
+    const auto since = kor::log::LastSequence();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(framebuffer);
+        cb.BindGraphicsPipeline(pipeline);
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("model", kor::Mat4(1.f)).PushConstant("color", kor::Vec3{ 0.f, 0.f, 1.f });
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics).Wait();
+    for (const auto& record : kor::log::HistorySince(since))
+        EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
+
+    Buffer::RawBuilder rb;
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel)).SetUsage(Buffer::Usage::eTransferDst).SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.CopyImageToBuffer(colorImage, readback); }, CommandBuffer::Usage::eTransfer).Wait();
+    const std::vector<Pixel> out = readback->Read<Pixel>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    EXPECT_EQ(out[out.size() / 2], (Pixel{ 0, 0, 255, 255 })) << "the colour pushed, as the fragment shader read it";
 }

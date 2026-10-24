@@ -30,6 +30,10 @@
  * - **Wiring:** a drag from a port draws a wire, and letting go on a port it fits (by type, or canConnect) makes it.
  *   A drag from an input that has a wire picks the wire up. Let go on nothing, a wire is offered to onWireDropped.
  * - **Keys:** Delete removes what is picked; Control+C, +V and +D copy, paste at the pointer and duplicate.
+ * - **Its look** is the theme's it is in, and in the manner of the theme's design (ThemeDesign): each draws cards,
+ *   ports, wires, the grid and comments its own way, but puts a node's title, rows and ports where kui::nodes says.
+ *   A card is a title bar tinted with its accent, then a row a port — its outputs first, then its inputs — each port's
+ *   mark shaped by what it carries (PortShape), and an input given a value says it in a field across its row.
  * - **Pressed twice**, a node is told to onActivate. **The right button** let go where it was pressed opens the menu
  *   NodeEditorOptions::menu gives, for the node under it (picked, with whatever else is) or for nothing.
  */
@@ -46,14 +50,24 @@
 
 namespace kui
 {
+    /** @brief What a port's mark is: by what it carries, so that one is told from another without its colour. */
+    enum class PortShape : std::uint8_t {
+        eCircle,        ///< A value, or anything else.
+        eSquare,        ///< A buffer.
+        eDiamond,       ///< An image.
+    };
+
     /** @brief One port of a node: what is wired into it (an input) or out of it (an output). */
     struct NodePort {
         std::string id;                     ///< Unique among the node's ports on its side.
         std::string label;
         std::string type;                   ///< What it carries: ports of one type wire together, unless canConnect says more.
-        Color color = colors::Inherit;      ///< Its dot's, and its wires'; the theme's accent when not set.
+        Color color = colors::Inherit;      ///< Its mark's, and its wires'; the theme's accent when not set.
+        PortShape shape = PortShape::eCircle;
         bool multiple = false;              ///< An input that takes several wires; an output always may.
-        std::string value;                  ///< An input given a value where a wire could go: said, faint, beside its label.
+        /// An input given a value where a wire could go: said in a field across its row, its label at one end and the value
+        /// at the other — as what can be changed, where a wire would otherwise come in.
+        std::string value;
         /// An input's own control — a slider, a box to tick, a colour to pick — beside its label, in place of @ref value:
         /// what it is set to on the node itself, while nothing is wired to it. Its row stays one row high.
         Widget control;
@@ -70,9 +84,16 @@ namespace kui
         std::vector<NodePort> inputs;       ///< Down its left side.
         std::vector<NodePort> outputs;      ///< Down its right side.
         Widget body;                        ///< Under the ports: the node's own controls, or nothing.
-        Color accent = colors::Inherit;     ///< Its title bar; the theme's surface when not set.
+        /// What kind of node it is: its title bar is tinted with it — mixed into the card, never as bright as it is.
+        /// When not set, what the theme's design puts there.
+        Color accent = colors::Inherit;
         std::string error;                  ///< When not empty, it is outlined in red and says this.
         float width = 0.f;                  ///< 0: as wide as it needs, and no narrower than 140.
+        /// How abstract it is, from 0 (a value) up: shown in its title bar's end as that many lit steps of five — so
+        /// that what is worked at, a number or a whole technique, is told at a glance. Below 0: not shown.
+        int level = -1;
+        /// Made of other nodes — a function's call, a technique: drawn as a stack of cards, not one.
+        bool composite = false;
     };
 
     /** @brief One port of one node. */
@@ -134,6 +155,7 @@ namespace kui
         float zoom = 1.f;                   ///< Units of the view to one of the graph's.
         kor::Vec2 size {};                  ///< How big the editor is, as last laid out.
         kor::Vec2 origin {};                ///< Where its top-left is, in the view's coordinates, as last painted.
+        std::map<std::string, kor::Vec2> sizes;     ///< How big each node's card came out, by id, as last laid out: what a layout of the page goes by.
 
         /** @brief Where a point of the graph is, in the view's coordinates. */
         [[nodiscard]] kor::Vec2 ToView(kor::Vec2 graph) const { return origin + size * 0.5f + (graph - centre) * zoom; }
@@ -231,17 +253,25 @@ namespace kui
     /** @brief Shows @p graph, and tells @p options of what the user does to it. Fills what it is given. */
     KUI_API Widget NodeEditor(NodeGraph graph, NodeEditorOptions options = {});
 
-    /** @brief How a node's card is laid out: where its ports are, for whoever draws or tests against it. */
+    /**
+     * @brief How a node's card is laid out: where its ports are, for whoever draws or tests against it. A port has a
+     *        row of its own: the node's outputs, then its inputs under them.
+     */
     namespace nodes {
-        inline constexpr float TitleHeight = 28.f;
-        inline constexpr float PortsTop = 6.f;      ///< Between the title and the first row of ports.
-        inline constexpr float RowHeight = 30.f;    ///< A row of ports: room for a control with some air round it.
+        inline constexpr float TitleHeight = 30.f;
+        inline constexpr float PortsTop = 4.f;      ///< Between the title and the first row of ports.
+        inline constexpr float RowHeight = 26.f;    ///< A row of ports: room for a small control.
         inline constexpr float MinWidth = 140.f;
         inline constexpr float PortRadius = 5.f;
-        /** @brief Where a node's @p index th port is, from its top-left: on its left edge for an input, its right for an output. */
-        inline kor::Vec2 PortOffset(const bool output, const std::size_t index, const float nodeWidth)
+        /** @brief Which row a node's @p index th port is on, of a node with @p outputs outputs: they come first. */
+        inline std::size_t PortRow(const bool output, const std::size_t index, const std::size_t outputs) { return output ? index : outputs + index; }
+        /**
+         * @brief Where a node's @p index th port is, from its top-left, of a node with @p outputs outputs: on its left
+         *        edge for an input, its right for an output.
+         */
+        inline kor::Vec2 PortOffset(const bool output, const std::size_t index, const float nodeWidth, const std::size_t outputs)
         {
-            return { output ? nodeWidth : 0.f, TitleHeight + PortsTop + (static_cast<float>(index) + 0.5f) * RowHeight };
+            return { output ? nodeWidth : 0.f, TitleHeight + PortsTop + (static_cast<float>(PortRow(output, index, outputs)) + 0.5f) * RowHeight };
         }
     }
 }

@@ -1397,11 +1397,14 @@ class RenderTextField final : public RenderContainer {
                     _pressed = true;
                     MarkNeedsPaint();
                     return true;
-                case PointerEvent::Type::eUp:
-                    if (_pressed) Open();
+                case PointerEvent::Type::eUp: {
+                    const bool open = _pressed;
                     _pressed = false;
                     MarkNeedsPaint();
+                    // Last: showing its list can take away the popup this is in, and this with it.
+                    if (open) Open();
                     return true;
+                }
                 case PointerEvent::Type::eCancel:
                     _pressed = false;
                     MarkNeedsPaint();

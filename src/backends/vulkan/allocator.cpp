@@ -3,6 +3,7 @@
 //
 
 #include "allocator.h"
+#include "gpuDiagnostics.h"
 
 #include <iostream>
 
@@ -59,6 +60,7 @@ namespace kor::vk
         ); result != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate buffer: " + ::vk::to_string(static_cast<::vk::Result>(result)));
         }
+        diag::NoteBuffer(buffer, bufferInfo);
 
 
         return { buffer, allocation };
@@ -66,6 +68,7 @@ namespace kor::vk
 
     void Allocator::FreeBuffer(const ::vk::Buffer buffer, const VmaAllocation allocation) const
     {
+        diag::NoteFreed(reinterpret_cast<std::uint64_t>(static_cast<VkBuffer>(buffer)));
         vmaDestroyBuffer(_allocator, buffer, allocation);
     }
 
@@ -88,12 +91,14 @@ namespace kor::vk
         ); result != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate image: " + ::vk::to_string(static_cast<::vk::Result>(result)));
         }
+        diag::NoteImage(image, imageInfo);
 
         return { image, allocation };
     }
 
     void Allocator::FreeImage(const ::vk::Image image, const VmaAllocation allocation) const
     {
+        diag::NoteFreed(reinterpret_cast<std::uint64_t>(static_cast<VkImage>(image)));
         vmaDestroyImage(_allocator, image, allocation);
     }
 

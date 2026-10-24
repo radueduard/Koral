@@ -853,7 +853,11 @@ namespace kui
             constexpr bool own = true;
 #endif
             if (options.leading) row.push_back(options.leading);
-            row.push_back(Expanded(Make<WindowControlWidget>(RenderWindowControl::Config { Kind::eDrag, title, height })));
+            Widget drag = Make<WindowControlWidget>(RenderWindowControl::Config { Kind::eDrag, title, height });
+            // What is in the middle takes the pointer where it is; around it, the bar still moves the window.
+            if (options.center)
+                drag = Stack({ std::move(drag), Positioned(PositionedOptions { .left = 0.f, .top = 0.f, .right = 0.f, .bottom = 0.f }, Center(options.center)) });
+            row.push_back(Expanded(std::move(drag)));
             if (options.trailing) row.push_back(options.trailing);
             if (own && options.buttons)
                 for (const Kind kind : { Kind::eMinimize, Kind::eMaximize, Kind::eClose })

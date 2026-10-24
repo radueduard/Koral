@@ -244,7 +244,16 @@ namespace kor
             {
                 declaredPushConstants.push_back(&pushConstant);
                 if (mergedPushConstants.contains(offset)) {
-                    mergedPushConstants[offset].stages |= pushConstant.stages;
+                    auto& merged = mergedPushConstants[offset];
+                    merged.stages |= pushConstant.stages;
+                    // A stage that reads more of the block than another — a fragment entry point given the
+                    // vertex one's `uniform`s and one more — makes the range as long as the longest: every
+                    // stage the range names has to be given all of its bytes. Whether the two agree on where
+                    // their shared constants sit is the name merge's to say, below.
+                    merged.size = std::max(merged.size, pushConstant.size);
+                    for (const auto& member : pushConstant.members)
+                        if (std::ranges::none_of(merged.members, [&](const auto& had) { return had.name == member.name; }))
+                            merged.members.push_back(member);
                 } else {
                     mergedPushConstants[offset] = pushConstant;
                 }

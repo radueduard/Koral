@@ -289,6 +289,12 @@ namespace kui
 
         static Theme Dark();
         static Theme Light();
+        /**
+         * @brief A theme in @p design's manner, coloured as its family colours things — Material 3's baseline
+         *        scheme, Apple's system colours, Windows 11's with its default accent — dark or light. eKoral is Dark()
+         *        or Light(). What an application that wants that look sets.
+         */
+        static Theme Of(ThemeDesign design, bool dark);
         /** @brief The theme of the Ui being built. */
         static const Theme& Current();
     };
@@ -975,9 +981,11 @@ namespace kui
         Widget trailing;                    ///< Before the window's buttons: a search field, an account.
         float height = 36.f;
         bool buttons = true;                ///< The window's own three: minimize, maximize or restore, close. (On macOS the system's, always, at the left.)
+        Widget center;                      ///< In the middle of the room between the two, over the title: a run's controls.
 
         TitleBarOptions& SetLeading(Widget value) { leading = std::move(value); return *this; }
         TitleBarOptions& SetTrailing(Widget value) { trailing = std::move(value); return *this; }
+        TitleBarOptions& SetCenter(Widget value) { center = std::move(value); return *this; }
         TitleBarOptions& SetHeight(float value) { height = value; return *this; }
         TitleBarOptions& SetButtons(bool value) { buttons = value; return *this; }
     };

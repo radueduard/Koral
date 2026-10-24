@@ -192,6 +192,8 @@ namespace kui
                 if (_config.open && _config.popup) {
                     const RenderObject* in = Parent();
                     const kor::Vec2 at = (in ? in->ToGlobal({ 0.f, _config.below ? in->Size().y : 0.f }) : ToGlobal({})) + _config.offset;
+                    // Its own popup shown again, with what it holds now (built again): not closed, and not to be dismissed.
+                    if (_shown) owner->onPopupClosed = nullptr;
                     owner->showPopup(_config.popup, at, { 1.f, 1.f });
                     _shown = true;
                     // Closed by anything but this — a press elsewhere, Escape — whoever opened it hears of it.

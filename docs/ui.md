@@ -98,7 +98,7 @@ struct Card : kui::StatelessWidget {
 | Controls | |
 |---|---|
 | `Button(child, onPressed)` | Any widget, made a button: a container that calls back when clicked. `ButtonStyle::ePrimary`, `eSecondary`, or `ePlain` (just the child, clickable). `Button("label", ...)` is the same holding text |
-| `Checkbox`, `Switch`, `Slider`, `ProgressBar`, `TextField` | Styled by the Ui's `kui::Theme` (`Dark()`, `Light()`, or your own). A `TextField` with `controlled` set always shows its `text`, as a Compose or React field does |
+| `Checkbox`, `Switch`, `Slider`, `ProgressBar`, `TextField` | Styled by the Ui's `kui::Theme` (`Dark()`, `Light()`, `Of(design, dark)` for Material, Cupertino or Fluent (Windows 11) in their own colours, or your own). A `TextField` with `controlled` set always shows its `text`, as a Compose or React field does |
 | `Themed(theme, child)` | `child` in a theme of its own, whatever the Ui's is. `Theme` also says how round a button, a field and a checkbox are (`buttonRadius`, `fieldRadius`, `checkboxRadius`; negative: `radius`, and a circle). `QuerySystemAppearance()` is whether the system is dark, and its accent |
 | `Text(text, style, align, wrap, maxLines, ellipsis)` | `TextStyle` has `weight` (400 as drawn, 700 bold: the font thickened), `italic`, `underline` and `lineThrough`; `maxLines` keeps so many lines, the last ending in an ellipsis when asked. `Slider(..., onFinished)` says when it is let go of; a `TextField`'s `focus`, when it changes, gives it the keyboard, and `Ui::ClearFocus()` takes it away |
 | `RadioButton`, `Selectable` | One of several choices; a line of a list that can be picked |
@@ -299,13 +299,28 @@ auto editor = kui::NodeEditor(graph, kui::NodeEditorOptions{}
 | Pressed twice | A node pressed twice goes to `onActivate`. |
 | Frames | A comment with `around` is a frame round those nodes, wherever they are: dragged by its title it carries them, and it has no corner to resize. |
 
-A port's `value`, for an input given a value where a wire could go, is said faintly beside its label.
+**A card** is a title bar tinted with the node's `accent` (mixed into the card, never as bright as it is), then a
+row a port: its outputs first, at its right edge, then its inputs under them, at its left (`kui::nodes::PortOffset`
+says where each is, given how many outputs the node has). A port's mark is shaped by what it carries
+(`NodePort::shape`: a circle, a square for a buffer, a diamond for an image), filled once it is wired. An input
+given a `value` where a wire could go says it in a field across its row, its label at one end and the value at the
+other; one with a `control` has the control at the row's end.
 
 **Where it looks**, given a `kui::NodeEditorView` (`SetView`), is the caller's: its `centre`, `zoom`, `size` and
 `origin` say where the editor is and what it shows (`ToView`, `ToGraph` between the two), `Frame()` frames the
 page and `Reveal(id)` picks a node and brings it into view, from the next layout. It is kept a page at a time:
 set `page` before each build, and a page is looked at where it was left — one shown for the first time is framed
 whole, once it has a node.
+
+**It is drawn in the theme it is in**, as the controls are, in the manner its `design` says: cards, title bars,
+ports, wires, the grid, comments and what says a thing is picked each have a look of their own in
+`eKoral` (dark cards on a hairline edge that is the accent's when picked, wires over a shadow of their own, wired
+ports ringed dark), `eMaterial` (tonal filled cards and headers, a dotted page, a thick focus ring off the card,
+filled fields), `eCupertino` (cards of frosted glass, headers of tinted glass, capsule fields, a soft ring of the
+accent, a grey rubber band) and `eFluent` (cards in a thin edge, a light wash of the accent for a header, outlined
+fields, ports as radio buttons, the accent's mark before a picked node's title). Only how things look changes: a node's title, rows
+and ports are where `kui::nodes` says in every design. `KUI_NODE_THEMES=<prefix>` on `koral_ui_tests
+--gtest_filter=NodeSheet.RendersInEveryDesign` draws one graph in each, dark and light, to look at.
 
 A node with an `error` is outlined in red and shows it. Where the view looks, how near, what is picked and
 any drag under way are the editor's own, so panning, zooming and dragging build nothing again, and what is

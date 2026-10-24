@@ -28,6 +28,7 @@
 #include "imageView.h"
 #include "scheduler.h"
 #include "timeline.h"
+#include "gpuDiagnostics.h"
 #include "../../core/tokenState.h"
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
@@ -1361,6 +1362,9 @@ namespace kor::vk
 
     void CommandBuffer::DoWriteTimerTimestamp(const kor::u32 queryIndex)
     {
+        // Emitted after End() handed the scopes over to _submittedTimers.
+        if (diag::Enabled() && VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdSetCheckpointNV && queryIndex / 2 < _submittedTimers.size())
+            VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdSetCheckpointNV(static_cast<VkCommandBuffer>(_handle), diag::Intern(std::format("{} {}", queryIndex % 2 == 0 ? "begin" : "end", _submittedTimers[queryIndex / 2].label)));
         if (!_timerPool) return;
         // An even slot opens a scope and an odd one closes it. Timestamping the *earliest* stage on
         // the way in and the *latest* on the way out is what makes the pair bracket the work rather

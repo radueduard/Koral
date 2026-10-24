@@ -3,6 +3,7 @@
 //
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "runtime.h"
+#include "gpuDiagnostics.h"
 #include <context.h>
 #include <framebuffer.h>
 #include <surface.h>
@@ -41,6 +42,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData) {
 
+        if (kor::vk::diag::NoteAddressBinding(messageType, pCallbackData)) return VK_FALSE;
         switch (messageSeverity) {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
                 kor::log::Info("[vulkan] {}", pCallbackData->pMessage);
@@ -253,7 +255,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             )
             .setMessageType(
                 ::vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                (kor::vk::diag::Enabled() ? ::vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding
+                                          : ::vk::DebugUtilsMessageTypeFlagsEXT{})
             )
             .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
 
