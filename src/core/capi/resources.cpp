@@ -544,6 +544,8 @@ void koral_shader_add_search_path(const char* directory, const bool front)
     GuardedVoid([&] { Shader::AddSearchPath(directory ? directory : "", front); });
 }
 
+} // extern "C": the helpers below return C++ types, which C linkage cannot
+
 namespace {
     // The reflection, in a fixed order: descriptors by set and binding, push-constant fields by block and
     // place, specialization constants by id.
@@ -562,6 +564,8 @@ namespace {
         return out;
     }
 }
+
+extern "C" {
 size_t koral_shader_parameter_count(KoralShader* r) { return Guarded([&] { return Parameters(Get<Shader>(r)).size(); }, size_t { 0 }); }
 bool koral_shader_parameter(KoralShader* r, const size_t index, KoralShaderParameter* out)
 {

@@ -1,5 +1,7 @@
 # koral-net's tests: everything over loopback — a server and its client in one process, TLS with a certificate
 # made on the spot, and the game protocol through its own simulator of a bad network. No outside network.
+# Found again here: this directory is added from tests/, where modules/net's imported OpenSSL targets are out of scope.
+find_package(OpenSSL REQUIRED)
 add_executable(koral_net_tests test_sockets.cpp test_http.cpp test_host.cpp test_replication.cpp)
 target_link_libraries(koral_net_tests PRIVATE koral-net Koral GTest::gtest GTest::gtest_main spdlog::spdlog OpenSSL::Crypto ZLIB::ZLIB)
 target_include_directories(koral_net_tests PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)

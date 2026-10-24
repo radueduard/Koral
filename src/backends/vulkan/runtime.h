@@ -36,6 +36,9 @@ namespace kor::vk
         // (see Device::Device(), which filters this list through PhysicalDevice::supportsExtension).
         [[nodiscard]] const std::vector<const char*>& getOptionalDeviceExtensions() const { return _optionalDeviceExtensions; }
 
+        // The extensions the instance was created with: the GLFW ones, plus whichever optional ones were available.
+        [[nodiscard]] const std::vector<const char*>& getInstanceExtensions() const { return _instanceExtensions; }
+
         [[nodiscard]] ::vk::Instance getInstance() const { return _instance; }
         [[nodiscard]] const PhysicalDevice& getPhysicalDevice() const { return *_physicalDevice; }
         /// Whether the instance has VK_KHR_surface_maintenance1, which a device's swapchain_maintenance1 builds on.

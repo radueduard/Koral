@@ -463,10 +463,10 @@ namespace kor {
         const HWND handle = glfwGetWin32Window(_window);
         const auto colour = [](const kor::Vec3 c) -> COLORREF {
             const auto byte = [](const float v) { return static_cast<DWORD>(std::clamp(v, 0.f, 1.f) * 255.f + 0.5f); };
-            return byte(c.r) | (byte(c.g) << 8) | (byte(c.b) << 16);
+            return byte(c.x) | (byte(c.y) << 8) | (byte(c.z) << 16);
         };
         constexpr DWORD UseDarkMode = 20, BorderColour = 34, CaptionColour = 35, TextColour = 36;   // DWMWA_*
-        const BOOL dark = background.r * 0.299f + background.g * 0.587f + background.b * 0.114f < 0.5f;
+        const BOOL dark = background.x * 0.299f + background.y * 0.587f + background.z * 0.114f < 0.5f;
         set(handle, UseDarkMode, &dark, sizeof dark);
         const COLORREF caption = colour(background), ink = colour(text);
         set(handle, CaptionColour, &caption, sizeof caption);

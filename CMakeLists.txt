@@ -243,6 +243,10 @@ target_sources(${PROJECT_NAME} PRIVATE ${KORAL_MCU_SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third_party/material-color-utilities)
 if(NOT MSVC)
     set_source_files_properties(${KORAL_MCU_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+else()
+    # It is written for GCC and Clang: C99 compound literals, which MSVC refuses (C4576) unless told to read
+    # them as the casts they are, and M_PI, which <cmath> only defines on request.
+    set_source_files_properties(${KORAL_MCU_SOURCES} PROPERTIES COMPILE_OPTIONS "/wd4576;/D_USE_MATH_DEFINES")
 endif()
 
 # kmath's noise, bulk operations and random numbers promise the same bits as their C# and Kotlin ports and
@@ -472,6 +476,10 @@ target_link_libraries(koral-glsld PRIVATE
         glslang::glslang
         glslang::glslang-default-resource-limits
         reflectcpp::reflectcpp)
+if(WIN32)
+    # It does not link Koral, so it misses Koral's NOMINMAX (see above), and <windows.h> breaks reflect-cpp's std::max.
+    target_compile_definitions(koral-glsld PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
 if(KORAL_SHADERS_PATH)
     # A dev build finds the engine's shaders in the source tree, as the runtime's dev fallback does.
     target_compile_definitions(koral-glsld PRIVATE KORAL_GLSLD_SOURCE_SHADERS="${KORAL_SHADERS_PATH}")
@@ -482,6 +490,9 @@ install(TARGETS koral-glsld RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 # rejects `{}` where the protocol says null-or-list. What a JetBrains IDE runs; VS Code runs slangd.
 add_executable(koral-slangd tools/slangd/main.cpp)
 target_link_libraries(koral-slangd PRIVATE reflectcpp::reflectcpp)
+if(WIN32)
+    target_compile_definitions(koral-slangd PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)   # as koral-glsld
+endif()
 install(TARGETS koral-slangd RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # The Slang grammar, from the Slang VS Code extension (see its NOTICE), as a bundle JetBrains' TextMate
@@ -879,6 +890,20 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
         list(APPEND KORAL_VENDOR_LIB_NAMES_DEBUG "${name}")
     endforeach()
 
+    # What spdlog's and fmt's own targets tell whoever compiles against them: that spdlog is compiled, not inline,
+    # with fmt beside it, and — where they are DLLs, as on Windows — imported. Without them a consumer compiles
+    # spdlog inline against the vendored headers, and with it <windows.h>, whose near and far break kmath.
+    set(KORAL_VENDOR_DEFINITIONS "")
+    foreach(dep spdlog::spdlog fmt::fmt)
+        if(TARGET ${dep})
+            get_target_property(definitions ${dep} INTERFACE_COMPILE_DEFINITIONS)
+            if(definitions)
+                list(APPEND KORAL_VENDOR_DEFINITIONS ${definitions})
+            endif()
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES KORAL_VENDOR_DEFINITIONS)
+
     file(APPEND "${KORAL_INSTALL_CONFIG}"
 "
 # Koral's public headers expose spdlog (and so fmt), so the SDK ships them; see KORAL_VENDOR_PUBLIC_DEPS
@@ -900,7 +925,8 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
 if(NOT TARGET Koral::vendored)
     add_library(Koral::vendored INTERFACE IMPORTED)
     set_target_properties(Koral::vendored PROPERTIES
-            INTERFACE_INCLUDE_DIRECTORIES \"\${KORAL_RELOADED_PREFIX}/${KORAL_VENDOR_INCLUDEDIR}\")
+            INTERFACE_INCLUDE_DIRECTORIES \"\${KORAL_RELOADED_PREFIX}/${KORAL_VENDOR_INCLUDEDIR}\"
+            INTERFACE_COMPILE_DEFINITIONS \"${KORAL_VENDOR_DEFINITIONS}\")
 
     set(KORAL_RELOADED_VENDORED_RELEASE \"\")
     foreach(name ${KORAL_VENDOR_LIB_NAMES})
@@ -1127,7 +1153,7 @@ add_custom_target(stage
         USES_TERMINAL
         COMMENT "Staging the $<CONFIG> SDK into stage/$<IF:$<CONFIG:Debug>,debug,release>")
 
-add_dependencies(stage ${PROJECT_NAME} Koral_Runtime)
+add_dependencies(stage ${PROJECT_NAME} Koral_Runtime koral-glsld koral-slangd)
 if(KORAL_BUILD_MODULES)
     add_dependencies(stage
             koral-camera koral-gui-extras koral-mesh
