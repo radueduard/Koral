@@ -229,7 +229,11 @@ namespace kor::vk
 
         buildAndStore(buildInfo, rangeInfos.data(), sizeInfo, primitiveCounts);
 
-        Context::Allocator().FreeBuffer(instanceBuffer, instanceAllocation);
+        // The build reads the instances on the GPU and is not waited for: they go once the GPU is past it, as the
+        // scratch does. Freed now, their memory could be another allocation's before the build has read it.
+        Context::DestroyWhenUnused([instanceBuffer, instanceAllocation] {
+            Context::Allocator().FreeBuffer(instanceBuffer, instanceAllocation);
+        });
     }
 
     void AccelerationStructure::buildAndStore(
