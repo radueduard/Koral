@@ -24,6 +24,8 @@
 #include "window.h"
 #include "frameGraphCompiler.h"
 
+#include <limits>
+
 namespace kor {
     struct PassBuilder::Impl {
         graph::PassDecl decl;
@@ -321,6 +323,11 @@ namespace kor {
         std::array<float, History> frameMs {};   // CPU frame time, a ring
         std::array<float, History> gpuMs {};     // the graph's GPU time, a ring
         std::size_t next = 0;
+        // When each pass last began on the GPU, on the device's clock, and in which frame: what PassTimings makes a
+        // timeline of. Frames are counted as they are recorded.
+        struct Began { double at = 0.0, ms = 0.0; std::uint64_t frame = 0; };
+        std::map<std::string, Began, std::less<>> began;
+        std::uint64_t frames = 0;
     };
 
     FrameGraph::FrameGraph() : _stats(std::make_shared<Stats>()), _owner(std::this_thread::get_id()) {}
@@ -328,8 +335,22 @@ namespace kor {
 
     std::vector<FrameGraph::PassTiming> FrameGraph::PassTimings() const {
         std::vector<PassTiming> out;
+        // The newest frame any pass was measured in, and when the first of its passes began: each start is from that.
+        std::uint64_t frame = 0;
         for (const RenderPass* pass : _order)
-            if (const auto it = _stats->passes.find(pass->Name()); it != _stats->passes.end()) out.push_back(it->second);
+            if (const auto it = _stats->began.find(pass->Name()); it != _stats->began.end()) frame = std::max(frame, it->second.frame);
+        double first = std::numeric_limits<double>::max();
+        for (const RenderPass* pass : _order)
+            if (const auto it = _stats->began.find(pass->Name()); it != _stats->began.end() && it->second.frame == frame) first = std::min(first, it->second.at);
+        for (const RenderPass* pass : _order)
+            if (const auto it = _stats->passes.find(pass->Name()); it != _stats->passes.end()) {
+                PassTiming timing = it->second;
+                if (const auto began = _stats->began.find(pass->Name()); began != _stats->began.end() && began->second.frame == frame && frame > 0) {
+                    timing.gpuStartMs = began->second.at - first;
+                    timing.gpuLastMs = began->second.ms;
+                }
+                out.push_back(std::move(timing));
+            }
         return out;
     }
 
@@ -1005,7 +1026,7 @@ namespace kor {
             if (!recorded[r]) continue;
             std::set<std::string> names;
             for (std::size_t i = runs[r].first; i < runs[r].first + runs[r].count; ++i) names.insert(_order[i]->Name());
-            recorded[r]->OnTimings([weak = std::weak_ptr(_stats), names = std::move(names)](const std::vector<TimerResult>& results) {
+            recorded[r]->OnTimings([weak = std::weak_ptr(_stats), names = std::move(names), frame = stats.frames + 1](const std::vector<TimerResult>& results) {
                 const auto statsNow = weak.lock();
                 if (!statsNow) return;   // the graph is gone
                 for (const auto& result : results) {
@@ -1013,6 +1034,7 @@ namespace kor {
                     auto& timing = statsNow->passes[result.label];
                     Stats::average(timing.gpuMs, result.milliseconds);
                     timing.gpuMeasured = true;
+                    statsNow->began[result.label] = { result.beginMs, result.milliseconds, frame };
                 }
             });
         }
@@ -1025,6 +1047,7 @@ namespace kor {
         stats.frameMs[stats.next] = scene->SceneTime().UnscaledFrameTime() * 1000.f;
         stats.gpuMs[stats.next] = static_cast<float>(gpuSum);
         stats.next = (stats.next + 1) % Stats::History;
+        ++stats.frames;
 
         // Handed over in order, as one group: the graph orders its own passes, so a pass on the async
         // queue waits only for the pass on the graphics queue it needs — and the other way round —

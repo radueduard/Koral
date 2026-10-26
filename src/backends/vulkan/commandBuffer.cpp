@@ -1377,7 +1377,7 @@ namespace kor::vk
         _handle.writeTimestamp(stage, _timerPool, queryIndex);
     }
 
-    bool CommandBuffer::DoReadTimerTimestamps(const kor::u32 scopeCount, std::vector<double>& millisecondsOut)
+    bool CommandBuffer::DoReadTimerTimestamps(const kor::u32 scopeCount, std::vector<double>& millisecondsOut, std::vector<double>& beginsOut)
     {
         if (!_timerPool || scopeCount == 0) return false;
 
@@ -1400,6 +1400,8 @@ namespace kor::vk
 
         millisecondsOut.clear();
         millisecondsOut.reserve(scopeCount);
+        beginsOut.clear();
+        beginsOut.reserve(scopeCount);
         for (kor::u32 i = 0; i < scopeCount; ++i) {
             const kor::u64 begin = results[i * 2].ticks;
             const kor::u64 end = results[i * 2 + 1].ticks;
@@ -1407,6 +1409,7 @@ namespace kor::vk
             // scope's two reads. Report zero rather than the enormous number the subtraction gives.
             const double ticks = end >= begin ? static_cast<double>(end - begin) : 0.0;
             millisecondsOut.push_back(ticks * static_cast<double>(_timestampPeriod) / 1'000'000.0);
+            beginsOut.push_back(static_cast<double>(begin) * static_cast<double>(_timestampPeriod) / 1'000'000.0);
         }
         return true;
     }

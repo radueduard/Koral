@@ -861,6 +861,8 @@ namespace kor
     struct TimerResult {
         std::string label;          ///< The name given to BeginTimer.
         double milliseconds = 0.0;  ///< GPU time between the scope's two timestamps.
+        /// When the scope began, in ms on the device's clock: only the difference between two of one device's means anything.
+        double beginMs = 0.0;
         kor::u32 depth = 0;         ///< Nesting depth; 0 for an outermost scope, 1 for one opened inside it, and so on.
     };
 

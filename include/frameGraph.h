@@ -461,6 +461,10 @@ namespace kor {
             double recordMs = 0.0;    ///< CPU time recording it (on a background thread under Vulkan).
             double prepareMs = 0.0;   ///< CPU time in its Prepare, on the main thread.
             bool gpuMeasured = false;
+            /// The last frame measured, as it was rather than averaged: when the pass started on the GPU, in ms after
+            /// the first of that frame's passes did — whichever queue each ran on — and how long it took. A timeline
+            /// of one frame. -1 when it is not known: not measured yet, or not run in that frame.
+            double gpuStartMs = -1.0, gpuLastMs = 0.0;
         };
         /** @brief Every scheduled pass, in the order it runs. */
         [[nodiscard]] std::vector<PassTiming> PassTimings() const;

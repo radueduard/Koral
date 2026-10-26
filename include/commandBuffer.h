@@ -1700,10 +1700,11 @@ namespace kor
          * @brief Backend hook: read back the previous submission's timestamps, without blocking.
          * @param scopeCount How many scopes that submission recorded; slots 2i and 2i+1 bound scope i.
          * @param millisecondsOut Filled with one duration per scope, in scope order.
+         * @param beginsOut Filled with when each scope began, in ms on the device's clock, in scope order.
          * @return false if the GPU has not finished with them, in which case nothing is reported
          *         and the previous results stand.
          */
-        virtual bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut) { return false; }
+        virtual bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut, std::vector<double>& beginsOut) { return false; }
 
         /**
          * @brief Fetches the last submission's timestamps if the GPU has finished with them.

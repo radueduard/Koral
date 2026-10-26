@@ -138,7 +138,7 @@ namespace kor::vk
         kor::Resource<kor::Image> _resolveHelperImage;
 
         void DoWriteTimerTimestamp(kor::u32 queryIndex) override;
-        bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut) override;
+        bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut, std::vector<double>& beginsOut) override;
 
     private:
         const kor::vk::Queue& _queue;

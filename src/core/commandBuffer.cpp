@@ -1288,11 +1288,11 @@ namespace kor
         // when they landed. Says yes so a repeated collectTimer keeps working.
         if (_submittedTimers.empty()) return !_timings.empty();
 
-        std::vector<double> milliseconds;
+        std::vector<double> milliseconds, begins;
         // Not ready is not an error — the results simply stay as they were, which keeps a
         // profiler's readings steady instead of flickering to nothing.
-        if (!DoReadTimerTimestamps(static_cast<kor::u32>(_submittedTimers.size()), milliseconds)
-            || milliseconds.size() != _submittedTimers.size())
+        if (!DoReadTimerTimestamps(static_cast<kor::u32>(_submittedTimers.size()), milliseconds, begins)
+            || milliseconds.size() != _submittedTimers.size() || begins.size() != _submittedTimers.size())
             return false;
 
         _timings.clear();
@@ -1301,6 +1301,7 @@ namespace kor
             _timings.push_back(TimerResult{
                 .label = _submittedTimers[i].label,
                 .milliseconds = milliseconds[i],
+                .beginMs = begins[i],
                 .depth = _submittedTimers[i].depth,
             });
         }
