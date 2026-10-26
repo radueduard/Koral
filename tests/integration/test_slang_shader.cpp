@@ -9,6 +9,10 @@
 #include "shader.h"
 #include "context.h"
 
+#include <filesystem>
+#include <fstream>
+#include <string_view>
+
 using kor::Shader;
 
 namespace {
@@ -89,6 +93,44 @@ TEST_F(GpuTest, ShaderGetOrBuildDefaultsItsIdentifier) {
     EXPECT_NE(vs.Get(), fs.Get());
     EXPECT_EQ(vs->ShaderStage(), Shader::Stage::eVertex);
     EXPECT_EQ(fs->ShaderStage(), Shader::Stage::eFragment);
+}
+
+// Two projects opened one after the other may each have a module of the same name. Each GetOrBuild is of the one its
+// search roots find now — not of whichever was built first — and a root asked for first again goes back to the front.
+TEST_F(GpuTest, ASlangModuleIsTheOneItsRootsFindNow) {
+    const auto base = std::filesystem::temp_directory_path() / "koral-twin-modules";
+    const auto write = [&](const char* project, const char* buffer) {
+        const auto dir = base / project;
+        std::filesystem::create_directories(dir);
+        std::ofstream(dir / "twinModule.slang") << "RWStructuredBuffer<float> " << buffer
+            << ";\n[shader(\"compute\")]\n[numthreads(1, 1, 1)]\nvoid computeMain() { " << buffer << "[0] = 1.0; }\n";
+        return dir;
+    };
+    const auto first = write("first", "firstBuffer"), second = write("second", "secondBuffer");
+    const auto names = [](const Shader& shader) {
+        std::string all;
+        for (const auto& [set, description] : shader.BlockLayout().descriptorSets)
+            for (const auto& [binding, descriptor] : description.descriptors) all += descriptor.name + " ";
+        return all;
+    };
+    const auto build = [] { return Shader::Builder{}.SetEntryPoint("twinModule", "computeMain").GetOrBuild(); };
+
+    Shader::AddSearchPath(first, true);
+    const auto a = build();
+    ASSERT_TRUE(a.Valid()) << a.Failure()->History();
+    EXPECT_NE(names(*a).find("firstBuffer"), std::string::npos) << names(*a);
+
+    Shader::AddSearchPath(second, true);
+    const auto b = build();
+    ASSERT_TRUE(b.Valid()) << b.Failure()->History();
+    EXPECT_NE(names(*b).find("secondBuffer"), std::string::npos) << "the second project's, not the first's: " << names(*b);
+
+    Shader::AddSearchPath(first, true);
+    EXPECT_EQ(Shader::SearchPaths().front(), first) << "asked for first again, it is first again";
+    const auto again = build();
+    ASSERT_TRUE(again.Valid());
+    EXPECT_EQ(again.Get(), a.Get()) << "the first's, as it was built";
+    std::filesystem::remove_all(base);
 }
 
 // A GLSL name with no stage tag is a clear error, not a silent compile as eCompute.

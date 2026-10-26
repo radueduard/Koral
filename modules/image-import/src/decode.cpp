@@ -196,6 +196,32 @@ namespace kimg::detail
         }, kor::CommandBuffer::Usage::eGraphics);
     }
 
+    void uploadSlices(const kor::ResourceRef<const kor::Image>& image, const KtxImage& ktx)
+    {
+        // The slices are ranges of the file's pixel data, each aligned to its block as KTX lays them out: that data,
+        // whole, is the staging buffer, and each slice is copied from its own offset in it.
+        std::size_t end = 0;
+        for (const auto& slice : ktx.slices) end = std::max(end, slice.offset + slice.size);
+        if (end == 0) return;
+        const auto staging = kor::Buffer::Builder<unsigned char>()
+            .SetDataView(std::span<const unsigned char>(ktx.data, end))
+            .SetUsage(kor::Buffer::Usage::eTransferSrc)
+            .SetType(kor::Buffer::Type::eStaging)
+            .Build();
+        (void)kor::CommandBuffer::Upload([&](kor::CommandBuffer& commandBuffer) {
+            for (const auto& slice : ktx.slices)
+                commandBuffer.CopyBufferToImage(staging, image, kor::Copy {
+                    .bufferOffset = slice.offset,
+                    .imageOffset = { 0, 0, 0 },
+                    .imageExtent = kor::IVec3(kor::UVec3 { std::max(1u, ktx.extent.x >> slice.mip), std::max(1u, ktx.extent.y >> slice.mip),
+                                                          std::max(1u, ktx.extent.z >> slice.mip) }),
+                    .imageBaseArrayLayer = slice.layer,
+                    .imageLayerCount = 1,
+                    .imageMipLevel = slice.mip,
+                });
+        }, kor::CommandBuffer::Usage::eGraphics);
+    }
+
     void finishUpload(const kor::ResourceRef<const kor::Image>& image, const bool generateMipmaps)
     {
         // A compressed image cannot be blitted into, and mips are made by blitting: it carries the

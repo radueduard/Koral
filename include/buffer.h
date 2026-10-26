@@ -509,7 +509,7 @@ namespace kor
                     stagingBuilder
                         .SetInstanceCount(ToBuilderSize(elemBytes, "ReadAt"))
                         .SetUsage(Usage::eTransferDst)
-                        .SetType(Type::eStaging);
+                        .SetType(Type::eReadback);
                     const auto stagingBuffer = stagingBuilder.Build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, elemBytes, index * elemBytes, 0);
@@ -620,11 +620,13 @@ namespace kor
             switch (_type) {
                 case Type::eDeviceLocal:
                 {
+                    // Into memory the CPU reads cached (eReadback): a staging buffer is write-combined, made for
+                    // the CPU to write, and reading hundreds of megabytes back through it took a second.
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
                         .SetInstanceCount(ToBuilderSize(byteSize, "Read"))
                         .SetUsage(Usage::eTransferDst)
-                        .SetType(Type::eStaging);
+                        .SetType(Type::eReadback);
                     const auto stagingBuffer = stagingBuilder.Build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, byteSize, byteOffset, 0);

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <cctype>
+
 #include <queue>
 #include <unordered_map>
 #include <iostream>
@@ -89,8 +91,14 @@ namespace kmdl {
         // normals after JoinIdenticalVertices is refused ("post-processing order mismatch"), and a
         // failed step frees the scene. Each is a no-op for a mesh that already has what it makes —
         // and each is decided per mesh, not from the first one.
+        //
+        // A glTF's vertices are shared by index already: joining identical ones hashes every vertex for nothing, and
+        // on a mesh of millions (Sponza's ivy, 3M) it was most of the read — seconds of it.
+        std::string extension = path.extension().string();
+        for (char& c : extension) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        const bool indexed = extension == ".gltf" || extension == ".glb";
         _scene = _importer.ReadFile(path.string(),
-            aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_GenBoundingBoxes
+            aiProcess_Triangulate | (indexed ? 0u : static_cast<unsigned>(aiProcess_JoinIdenticalVertices)) | aiProcess_SortByPType | aiProcess_GenBoundingBoxes
             | aiProcess_GenUVCoords | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 
         // Assimp returns null when the file is missing or unreadable, or a step failed. Bail out

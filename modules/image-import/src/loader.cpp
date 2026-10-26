@@ -35,17 +35,6 @@ namespace kimg
 
     namespace
     {
-        /** @brief Uploads every slice of a KTX image, one per call, in file order. */
-        void uploadKtxSlice(const kor::ResourceRef<const kor::Image>& image,
-                            const detail::KtxImage& ktx, const detail::KtxImage::Slice& slice)
-        {
-            detail::uploadSlice(image, std::span{ ktx.data + slice.offset, slice.size },
-                                { std::max(1u, ktx.extent.x >> slice.mip),
-                                  std::max(1u, ktx.extent.y >> slice.mip),
-                                  std::max(1u, ktx.extent.z >> slice.mip) },
-                                slice.layer, slice.mip);
-        }
-
         kor::Resource<kor::Image> loadKtx(const std::filesystem::path& path, const bool generateMipmaps)
         {
             auto ktx = detail::readKtx(path);
@@ -57,7 +46,7 @@ namespace kimg
             if (!image) return image;
 
             const kor::ResourceRef imageRef = image;
-            for (const auto& slice : ktx->slices) uploadKtxSlice(imageRef, *ktx, slice);
+            detail::uploadSlices(imageRef, *ktx);
 
             detail::finishUpload(imageRef, generateMipmaps && ktx->fileMipLevels == 1);
             return image;
@@ -79,13 +68,10 @@ namespace kimg
 
             const kor::ResourceRef imageRef = image;
 
-            // One slice per short main-thread visit, releasing the render thread between them. The
-            // round trip through the background executor is what re-enqueues the continuation.
-            for (const auto& slice : ktx->slices) {
-                uploadKtxSlice(imageRef, *ktx, slice);
-                co_await kor::Context::SwitchToBackgroundThread();
-                co_await kor::Context::SwitchToMainThread();
-            }
+            // The whole chain in one visit: one staging buffer, one command buffer. A visit a slice queued a dozen
+            // continuations a texture behind the main thread's budget of a millisecond a frame, and a scene of many
+            // textures arrived over seconds.
+            detail::uploadSlices(imageRef, *ktx);
 
             detail::finishUpload(imageRef, generateMipmaps && ktx->fileMipLevels == 1);
             co_return std::move(image);
@@ -107,7 +93,9 @@ namespace kimg
             return kor::Image::Builder()
                 .SetExtent(decoded.extent)
                 .SetFormat(decoded.format)
-                .SetMipLevels(generateMipmaps ? 0 : 1)
+                .SetMipLevels(generateMipmaps ? 0 : 1)
+
+
                 .Build();
         }
 

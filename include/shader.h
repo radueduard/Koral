@@ -476,7 +476,7 @@ namespace kor
          * @param dir The directory.
          * @param front Search it before the roots already registered. This is what the config uses:
          *        a project's shaders shadow the engine's same-named ones without ever losing access
-         *        to the rest.
+         *        to the rest. A root already registered is moved to the front.
          *
          * Koral's own shaders/ is always a root. A project adds its own here — or, more usually,
          * declares them in koral.json under "shaderDirectories" and lets the runtime do it.

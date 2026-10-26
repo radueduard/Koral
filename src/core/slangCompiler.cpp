@@ -5,6 +5,11 @@
 #include "slangCompiler.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <format>
+#include <fstream>
+#include <atomic>
+#include <cstring>
 #include <optional>
 #include <vector>
 
@@ -80,9 +85,194 @@ namespace kor
         }
     }
 
+    // ---- what was compiled before, kept on disk ----------------------------------------------------
+    //
+    // Compiling a module parses it and everything it imports, every time: a scene of fifty pipelines took seconds to
+    // open, each of them. A result is kept by its module, entry and search paths, with every file it was compiled from
+    // and that file's size and time; it is taken again only while each is as it was, and while no file of the module's
+    // name has come before it in the search paths. KORAL_SHADER_CACHE names where (`off`: nowhere).
+    namespace
+    {
+        constexpr std::uint32_t CacheMagic = 0x4b534c43;    // "KSLC"
+        constexpr std::uint32_t CacheVersion = 1;
+
+        std::filesystem::path cacheDirectory()
+        {
+            if (const char* asked = std::getenv("KORAL_SHADER_CACHE"); asked && *asked)
+                return std::string_view(asked) == "off" ? std::filesystem::path() : std::filesystem::path(asked);
+#ifdef _WIN32
+            if (const char* local = std::getenv("LOCALAPPDATA"); local && *local) return std::filesystem::path(local) / "Koral" / "slang";
+#else
+            if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg && *xdg) return std::filesystem::path(xdg) / "koral" / "slang";
+            if (const char* home = std::getenv("HOME"); home && *home) return std::filesystem::path(home) / ".cache" / "koral" / "slang";
+#endif
+            return {};
+        }
+
+        std::uint64_t fnv(const std::string_view text, std::uint64_t hash = 14695981039346656037ull)
+        {
+            for (const char c : text) { hash ^= static_cast<unsigned char>(c); hash *= 1099511628211ull; }
+            return hash;
+        }
+
+        /** A file's size and time, as it is now; nothing for one that is not there. */
+        std::optional<std::pair<std::uint64_t, std::int64_t>> stamp(const std::filesystem::path& file)
+        {
+            std::error_code ec;
+            const auto size = std::filesystem::file_size(file, ec);
+            if (ec) return std::nullopt;
+            const auto time = std::filesystem::last_write_time(file, ec);
+            if (ec) return std::nullopt;
+            return std::pair { static_cast<std::uint64_t>(size), static_cast<std::int64_t>(time.time_since_epoch().count()) };
+        }
+
+        struct Out {
+            std::string bytes;
+            template <typename T> requires std::is_arithmetic_v<T> void put(const T value) { bytes.append(reinterpret_cast<const char*>(&value), sizeof value); }
+            void text(const std::string_view text) { put<std::uint64_t>(text.size()); bytes.append(text); }
+        };
+        struct In {
+            std::string_view bytes;
+            bool ok = true;
+            template <typename T> T get()
+            {
+                T value {};
+                if (bytes.size() < sizeof value) { ok = false; return value; }
+                std::memcpy(&value, bytes.data(), sizeof value);
+                bytes.remove_prefix(sizeof value);
+                return value;
+            }
+            std::string text()
+            {
+                const auto size = get<std::uint64_t>();
+                if (!ok || bytes.size() < size) { ok = false; return {}; }
+                std::string value(bytes.substr(0, size));
+                bytes.remove_prefix(size);
+                return value;
+            }
+        };
+
+        std::string serialize(const SlangCompileResult& result)
+        {
+            Out out;
+            out.put(CacheMagic);
+            out.put(CacheVersion);
+            out.put(static_cast<std::uint32_t>(result.stage));
+            out.put<std::uint64_t>(result.spirv.size());
+            out.bytes.append(reinterpret_cast<const char*>(result.spirv.data()), result.spirv.size() * sizeof(kor::u32));
+            out.text(result.resolvedPath.string());
+            out.put<std::uint64_t>(result.dependencies.size());
+            for (const auto& dependency : result.dependencies) {
+                const auto now = stamp(dependency);
+                out.text(dependency.string());
+                out.put<std::uint64_t>(now ? now->first : 0);
+                out.put<std::int64_t>(now ? now->second : 0);
+            }
+            out.put<std::uint64_t>(result.fieldSemantics.size());
+            for (const auto& [field, semantic] : result.fieldSemantics) { out.text(field); out.text(semantic.moduleName); out.text(semantic.semantic); }
+            out.put<std::uint64_t>(result.varyingSemantics.size());
+            for (const auto& [location, semantic] : result.varyingSemantics) { out.put(location); out.text(semantic.moduleName); out.text(semantic.semantic); }
+            out.put<std::uint64_t>(result.pushHandles.size());
+            for (const auto& [path, kind] : result.pushHandles) { out.text(path); out.put(static_cast<std::uint8_t>(kind)); }
+            out.put<std::uint64_t>(result.entryParameters.size());
+            for (const auto& name : result.entryParameters) out.text(name);
+            return std::move(out.bytes);
+        }
+
+        /** A result kept, while every file it was compiled from is as it was; nothing otherwise. */
+        std::optional<SlangCompileResult> deserialize(const std::string_view bytes)
+        {
+            In in { bytes };
+            if (in.get<std::uint32_t>() != CacheMagic || in.get<std::uint32_t>() != CacheVersion) return std::nullopt;
+            SlangCompileResult result;
+            result.stage = static_cast<Shader::Stage>(in.get<std::uint32_t>());
+            const auto words = in.get<std::uint64_t>();
+            if (!in.ok || in.bytes.size() < words * sizeof(kor::u32)) return std::nullopt;
+            result.spirv.resize(words);
+            std::memcpy(result.spirv.data(), in.bytes.data(), words * sizeof(kor::u32));
+            in.bytes.remove_prefix(words * sizeof(kor::u32));
+            result.resolvedPath = in.text();
+            for (auto count = in.get<std::uint64_t>(); in.ok && count > 0; --count) {
+                std::filesystem::path dependency = in.text();
+                const auto size = in.get<std::uint64_t>();
+                const auto time = in.get<std::int64_t>();
+                const auto now = stamp(dependency);
+                if (!in.ok || !now || now->first != size || now->second != time) return std::nullopt;     // changed since
+                result.dependencies.push_back(std::move(dependency));
+            }
+            for (auto count = in.get<std::uint64_t>(); in.ok && count > 0; --count) {
+                std::string field = in.text(), module = in.text(), semantic = in.text();
+                result.fieldSemantics.emplace(std::move(field), SlangCompileResult::FieldSemantic { std::move(module), std::move(semantic) });
+            }
+            for (auto count = in.get<std::uint64_t>(); in.ok && count > 0; --count) {
+                const auto location = in.get<kor::u32>();
+                std::string module = in.text(), semantic = in.text();
+                result.varyingSemantics.emplace(location, SlangCompileResult::FieldSemantic { std::move(module), std::move(semantic) });
+            }
+            for (auto count = in.get<std::uint64_t>(); in.ok && count > 0; --count) {
+                std::string path = in.text();
+                result.pushHandles.emplace(std::move(path), static_cast<BindlessKind>(in.get<std::uint8_t>()));
+            }
+            for (auto count = in.get<std::uint64_t>(); in.ok && count > 0; --count) result.entryParameters.insert(in.text());
+            if (!in.ok) return std::nullopt;
+            return result;
+        }
+
+        /** Whether a file of the module's name is found before the one it was compiled from: then it would be that one. */
+        bool shadowed(const std::string& module, const std::filesystem::path& resolved, const std::vector<std::filesystem::path>& searchPaths)
+        {
+            std::string file = module;
+            std::ranges::replace(file, '.', '/');
+            std::error_code ec;
+            for (const auto& path : searchPaths) {
+                for (const std::string& name : { file, [&] { std::string dashed = file; std::ranges::replace(dashed, '_', '-'); return dashed; }() }) {
+                    const auto candidate = path / (name + ".slang");
+                    if (!std::filesystem::exists(candidate, ec)) continue;
+                    return !std::filesystem::equivalent(candidate, resolved, ec);
+                }
+            }
+            return false;
+        }
+    }
+
+    namespace { SlangCompileResult compileNow(const std::string& module, const std::string& entry, const std::vector<std::filesystem::path>& searchPaths); }
+
     SlangCompileResult SlangCompiler::Compile(const std::string& module,
                                               const std::string& entry,
                                               const std::vector<std::filesystem::path>& searchPaths)
+    {
+        const std::filesystem::path directory = cacheDirectory();
+        if (directory.empty()) return compileNow(module, entry, searchPaths);
+        std::string what = std::format("{}\n{}\n{}", globalSession()->getBuildTagString(), module, entry);
+        for (const auto& path : searchPaths) what += "\n" + path.lexically_normal().string();
+        const auto file = directory / std::format("{}-{:016x}.kslc", module, fnv(what));
+        {
+            std::ifstream in(file, std::ios::binary);
+            if (in) {
+                const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                if (auto kept = deserialize(bytes); kept && !shadowed(module, kept->resolvedPath, searchPaths)) return std::move(*kept);
+            }
+        }
+        SlangCompileResult result = compileNow(module, entry, searchPaths);
+        // Kept for the next time — written whole and then put in place, so that a reader never finds half of it.
+        std::error_code ec;
+        std::filesystem::create_directories(directory, ec);
+        static std::atomic<std::uint64_t> written { 0 };
+        const auto partial = std::filesystem::path(file).concat(std::format(".{}.part", written++));
+        {
+            std::ofstream out(partial, std::ios::binary | std::ios::trunc);
+            const std::string bytes = serialize(result);
+            out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+        }
+        std::filesystem::rename(partial, file, ec);
+        if (ec) std::filesystem::remove(partial, ec);
+        return result;
+    }
+
+    namespace {
+    SlangCompileResult compileNow(const std::string& module,
+                                  const std::string& entry,
+                                  const std::vector<std::filesystem::path>& searchPaths)
     {
         // Per-compile session carrying the current search paths and a SPIR-V target.
         std::vector<std::string> pathStrings;
@@ -341,5 +531,6 @@ namespace kor
             }
         }
         return result;
+    }
     }
 }

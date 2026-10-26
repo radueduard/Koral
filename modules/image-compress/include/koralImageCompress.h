@@ -95,6 +95,20 @@ namespace kimg
         eASTC,
     };
 
+    /**
+     * @brief A desktop block format a UASTC texture is transcoded into before it is written.
+     *
+     * The file then holds exactly what the GPU samples — no transcode on load, and the format is the
+     * one chosen rather than the device's pick. What each reads from the source:
+     *  - eBC1: RGB, 4 bits a texel; no alpha.
+     *  - eBC3: RGB and a smooth alpha, 8 bits a texel.
+     *  - eBC4: one channel, read from the source's green — give a grey picture, or the value in R, G and B — 4 bits a texel.
+     *  - eBC5: two channels, red from the source's green and green from its alpha — give (x, x, x, y) — 8 bits a
+     *          texel. Tangent-space normal maps.
+     *  - eBC7: RGBA, 8 bits a texel; the best of them.
+     */
+    enum class BlockFormat : std::uint8_t { eNone, eBC1, eBC3, eBC4, eBC5, eBC7 };
+
     /** @brief How to encode. The defaults are what you want for a colour texture. */
     struct KIMG_COMPRESS_API CompressOptions
     {
@@ -141,6 +155,14 @@ namespace kimg
          * entropy coding.
          */
         bool supercompress = true;
+
+        /**
+         * @brief Not eNone: what the encoded UASTC is transcoded into before it is written, with
+         *        Codec::eUASTC only. Supercompression then deflates those blocks.
+         *
+         * The file is recorded as UNORM unless `srgb` is set, as for any other codec.
+         */
+        BlockFormat transcodeTo = BlockFormat::eNone;
     };
 
     /**

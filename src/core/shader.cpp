@@ -122,7 +122,16 @@ namespace kor {
     std::string Shader::Builder::DefaultIdentifier() const
     {
         const Builder b = Resolved();
-        const std::string source = b.lang == Lang::eSlang ? b.module : b.path.string();
+        // A Slang module is named by its file where the search roots find it now, not by its bare name: two projects
+        // opened one after the other may each have a `sky` module, and a shader of the first's must not stand in for
+        // the second's. Found nowhere, it keeps its name (the compile says what is missing).
+        std::string source = b.lang == Lang::eSlang ? b.module : b.path.string();
+        if (b.lang == Lang::eSlang && !b.module.empty())
+            for (const auto& root : SearchPaths())
+                if (std::error_code ignored; std::filesystem::is_regular_file(root / (b.module + ".slang"), ignored)) {
+                    source = (root / (b.module + ".slang")).lexically_normal().generic_string();
+                    break;
+                }
         // GLSL's entry is always "main", so it adds nothing to the key; Slang's distinguishes the
         // several shaders that share one module.
         return b.lang == Lang::eSlang ? std::format("{}:{}", source, b.entry) : source;
@@ -285,7 +294,13 @@ namespace kor {
     void Shader::AddSearchPath(const std::filesystem::path& dir, const bool front)
     {
         auto& paths = shaderSearchPathsStorage();
-        if (dir.empty() || std::ranges::find(paths, dir) != paths.end()) return;
+        if (dir.empty()) return;
+        // One already there and asked for first again — a project opened again after another — moves to the front:
+        // otherwise the other's modules of the same names would be found before its own.
+        if (const auto there = std::ranges::find(paths, dir); there != paths.end()) {
+            if (front) std::rotate(paths.begin(), there, std::next(there));
+            return;
+        }
         if (front) paths.insert(paths.begin(), dir);
         else       paths.push_back(dir);
     }

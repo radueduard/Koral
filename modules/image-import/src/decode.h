@@ -47,6 +47,13 @@ namespace kimg::detail
 
     // ---- upload helpers, shared by every loader in the module -----------------------------------
 
+    struct KtxImage;
+    /**
+     * @brief Uploads every slice of a KTX image — each mip of each layer — through one staging buffer and one command
+     *        buffer: one visit to the main thread for the whole chain, where a slice each was a dozen.
+     */
+    void uploadSlices(const kor::ResourceRef<const kor::Image>& image, const KtxImage& ktx);
+
     /** @brief Uploads one CPU-side buffer into one mip level of one array layer. */
     void uploadSlice(const kor::ResourceRef<const kor::Image>& image, std::span<const unsigned char> bytes,
                      kor::UVec3 extent, kor::u32 layer, kor::u32 mip);

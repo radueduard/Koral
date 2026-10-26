@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <format>
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include <ktx.h>
@@ -102,6 +103,9 @@ namespace kimg
             }
         }
 
+        /** @brief As many encoder threads as the machine has: libktx's encoders take one unless told otherwise. */
+        ktx_uint32_t EncoderThreads() { return std::max(1u, std::thread::hardware_concurrency()); }
+
         /** @brief Runs the encoder the options ask for over an already-populated texture. */
         std::expected<void, kor::Error> encode(ktxTexture2* texture, const std::filesystem::path& target,
                                               const CompressOptions& options)
@@ -115,7 +119,7 @@ namespace kimg
                 params.qualityLevel = std::clamp<kor::u32>(options.quality, 1, KTX_PACK_ASTC_QUALITY_LEVEL_MAX);
                 params.normalMap = options.normalMap ? KTX_TRUE : KTX_FALSE;
                 params.perceptual = options.normalMap ? KTX_FALSE : KTX_TRUE;
-                params.threadCount = 0;   // libktx picks a sensible number
+                params.threadCount = EncoderThreads();
 
                 if (const auto result = ktxTexture2_CompressAstcEx(texture, &params); result != KTX_SUCCESS)
                     return std::unexpected(compressError(target,
@@ -128,7 +132,7 @@ namespace kimg
                 ktxBasisParams params {};
                 params.structSize = sizeof(params);
                 params.uastc = options.codec == Codec::eUASTC ? KTX_TRUE : KTX_FALSE;
-                params.threadCount = 0;
+                params.threadCount = EncoderThreads();
                 params.normalMap = options.normalMap ? KTX_TRUE : KTX_FALSE;
 
                 if (options.codec == Codec::eUASTC) {
@@ -146,6 +150,19 @@ namespace kimg
                         std::format("{} encoding failed ({})",
                                     options.codec == Codec::eUASTC ? "UASTC" : "ETC1S",
                                     ktxErrorString(result))));
+
+                // Made into the block format asked for: the file holds what the GPU samples.
+                if (options.transcodeTo != BlockFormat::eNone) {
+                    if (options.codec != Codec::eUASTC)
+                        return std::unexpected(compressError(target, "only UASTC is transcoded into a block format before it is written"));
+                    const ktx_transcode_fmt_e into = options.transcodeTo == BlockFormat::eBC1 ? KTX_TTF_BC1_RGB
+                                                   : options.transcodeTo == BlockFormat::eBC3 ? KTX_TTF_BC3_RGBA
+                                                   : options.transcodeTo == BlockFormat::eBC4 ? KTX_TTF_BC4_R
+                                                   : options.transcodeTo == BlockFormat::eBC5 ? KTX_TTF_BC5_RG
+                                                   : KTX_TTF_BC7_RGBA;
+                    if (const auto result = ktxTexture2_TranscodeBasis(texture, into, KTX_TF_HIGH_QUALITY); result != KTX_SUCCESS)
+                        return std::unexpected(compressError(target, std::format("transcoding into a block format failed ({})", ktxErrorString(result))));
+                }
 
                 // ETC1S carries its own entropy coding; deflating it again buys nothing.
                 if (options.supercompress && options.codec == Codec::eUASTC) {
