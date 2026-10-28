@@ -789,17 +789,22 @@ namespace kui
         const auto& o = _options;
         constexpr float slop = 4.f;
         switch (event.type) {
-        case PointerEvent::Type::eDown:
-            if (event.button != kor::MouseButton::eLeft) return false;
+        case PointerEvent::Type::eDown: {
+            // The left taps, and pans unless another button does; that other only pans.
+            const bool pans = event.button == o.panButton, taps = event.button == kor::MouseButton::eLeft;
+            if (!pans && !taps) return false;
             if (o.yieldToChildren && event.taken) return false;
             _pressed = true;
             _panning = false;
+            _button = event.button;
             _down = event.local;
-            if (o.onTapDown) o.onTapDown(event.local);
-            return o.onTap || o.onTapDown || o.onTapUp || o.onPanStart || o.onPanUpdate || o.onPanEnd;
+            if (taps && o.onTapDown) o.onTapDown(event.local);
+            const bool tapping = taps && (o.onTap || o.onTapDown || o.onTapUp), panning = pans && (o.onPanStart || o.onPanUpdate || o.onPanEnd);
+            return tapping || panning;
+        }
         case PointerEvent::Type::eMove:
             if (!_pressed) return false;
-            if (!_panning && (o.onPanStart || o.onPanUpdate || o.onPanEnd) && kor::Length(event.local - _down) > slop) {
+            if (!_panning && _button == o.panButton && (o.onPanStart || o.onPanUpdate || o.onPanEnd) && kor::Length(event.local - _down) > slop) {
                 _panning = true;
                 if (o.onPanStart) o.onPanStart(_down);
                 if (o.onPanUpdate) o.onPanUpdate(event.local - _down, event.local);
@@ -808,10 +813,10 @@ namespace kui
             if (_panning && o.onPanUpdate) o.onPanUpdate(event.delta, event.local);
             return _panning;
         case PointerEvent::Type::eUp:
-            if (!_pressed) return false;
+            if (!_pressed || event.button != _button) return false;
             _pressed = false;
             if (_panning) { if (o.onPanEnd) o.onPanEnd(); }
-            else {
+            else if (_button == kor::MouseButton::eLeft) {
                 if (o.onTapUp) o.onTapUp();
                 const kor::Vec2 s = Size();
                 if (o.onTap && event.local.x >= 0.f && event.local.y >= 0.f && event.local.x < s.x && event.local.y < s.y) o.onTap();
@@ -825,7 +830,11 @@ namespace kui
             return false;
         case PointerEvent::Type::eEnter: if (o.onEnter) o.onEnter(); return false;
         case PointerEvent::Type::eExit: if (o.onExit) o.onExit(); return false;
-        case PointerEvent::Type::eHover: if (o.onHover) o.onHover(event.local); return false;
+        case PointerEvent::Type::eHover:
+            if (o.cursor)
+                if (Owner* owner = GetOwner()) owner->cursor = *o.cursor;
+            if (o.onHover) o.onHover(event.local);
+            return false;
         case PointerEvent::Type::eScroll: return o.onScroll ? o.onScroll(event.delta) : false;
         }
         return false;

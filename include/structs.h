@@ -858,11 +858,23 @@ namespace kor
      *
      * @see CommandBuffer::BeginTimer
      */
+    /** @brief What a timer scope's commands did, as bits of TimerResult::work. */
+    struct TimerWork {
+        static constexpr kor::u8 Draw = 1;          ///< Drew: draws, indexed, indirect, mesh tasks.
+        static constexpr kor::u8 Dispatch = 2;      ///< Dispatched compute.
+        static constexpr kor::u8 Rays = 4;          ///< Traced rays.
+        static constexpr kor::u8 Transfer = 8;      ///< Copied, blitted, resolved, filled or cleared.
+    };
+
     struct TimerResult {
         std::string label;          ///< The name given to BeginTimer.
         double milliseconds = 0.0;  ///< GPU time between the scope's two timestamps.
-        /// When the scope began, in ms on the device's clock: only the difference between two of one device's means anything.
+        /// When the scope began, in ms: on the CPU's steady clock when @ref cpuClock — the device can say how its clock and
+        /// the CPU's line up — else on the device's own, where only the difference between two of one device's means anything.
         double beginMs = 0.0;
+        bool cpuClock = false;
+        /// What the scope's commands did, as TimerWork bits: drew, dispatched, traced rays, copied or cleared.
+        kor::u8 work = 0;
         kor::u32 depth = 0;         ///< Nesting depth; 0 for an outermost scope, 1 for one opened inside it, and so on.
     };
 

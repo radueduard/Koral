@@ -320,6 +320,49 @@ TEST_F(GpuTest, MoreDescriptorSetsThanOnePoolHolds) {
     ExpectNoValidationErrors(before);
 }
 
+// What a Slang shader says of its push constants beyond their types — the defaults they are declared with, a vector's
+// read from the source where Slang cannot give it, and their attributes with their numbers — for a tool that shows them.
+TEST_F(GpuTest, PushConstantsKeepTheirDefaultsAndAttributes) {
+    AddTestShaders();
+    const auto shader = Shader::Builder{}.SetEntryPoint("pushAnnotations", "computeMain").GetOrBuild();
+    ASSERT_TRUE(shader.Valid());
+    const auto pipeline = ComputePipeline::Builder{}.SetComputeShader(shader).Build();
+    ASSERT_TRUE(pipeline.Valid());
+    const auto annotation = [&](const char* name) {
+        const auto* found = pipeline->FindPushConstant(name);
+        EXPECT_NE(found, nullptr) << name;
+        return found ? found->annotation : Shader::Annotation {};
+    };
+
+    const auto speed = annotation("speed");
+    EXPECT_TRUE(speed.declaresInitial);
+    EXPECT_EQ(speed.initial, std::vector<double> { 10.0 });
+    ASSERT_EQ(speed.attributes.size(), 1u);
+    EXPECT_EQ(speed.attributes[0].name, "Range");
+    EXPECT_EQ(speed.attributes[0].numbers, (std::vector<double> { 0.0, 50.0 }));
+
+    const auto tint = annotation("tint");
+    EXPECT_EQ(tint.initial, (std::vector<double> { 1.0, 0.5, 0.0, 1.0 })) << "a vector's, from the source";
+    ASSERT_EQ(tint.attributes.size(), 1u);
+    EXPECT_EQ(tint.attributes[0].name, "Color");
+    EXPECT_TRUE(tint.attributes[0].numbers.empty());
+
+    EXPECT_EQ(annotation("count").initial, std::vector<double> { -3.0 });
+    EXPECT_FALSE(annotation("plain").declaresInitial);
+    EXPECT_TRUE(annotation("plain").initial.empty());
+
+    const auto length = annotation("wave.length");
+    EXPECT_EQ(length.initial, std::vector<double> { 2.5 });
+    ASSERT_EQ(length.attributes.size(), 1u);
+    EXPECT_EQ(length.attributes[0].name, "Steps");
+    EXPECT_EQ(length.attributes[0].numbers, std::vector<double> { 4.0 });
+    EXPECT_EQ(annotation("wave.direction").initial, (std::vector<double> { 1.0, 0.0, 0.5 }));
+    EXPECT_EQ(annotation("wave.offset").initial, (std::vector<double> { 3.0, 3.0 })) << "one number, for each component";
+    const auto worked = annotation("wave.worked");
+    EXPECT_TRUE(worked.declaresInitial) << "there";
+    EXPECT_TRUE(worked.initial.empty() || worked.initial == std::vector<double> { 6.0 }) << "read only when Slang gives it";
+}
+
 // Push constants as bytes laid out from reflection: for code that has the shader's block and no C++ struct of it.
 TEST_F(GpuTest, PushConstantsAreGivenAsBytes) {
     const auto pipeline = ComputePipeline::Builder{}.SetComputeShader(SplitShader()).Build();

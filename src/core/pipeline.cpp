@@ -408,7 +408,7 @@ namespace kor
                     .scalar = member.scalar, .rows = member.rows, .columns = member.columns,
                     .count = member.count, .arrayStride = member.arrayStride,
                     .matrixStride = member.matrixStride, .aggregate = member.aggregate,
-                    .handle = member.handle, .parameter = member.parameter });
+                    .handle = member.handle, .parameter = member.parameter, .annotation = member.annotation });
             }
         }
 

@@ -415,9 +415,18 @@ namespace kui
          * taps nor pans. Off, it hears every press on it as well as what it holds does.
          */
         bool yieldToChildren = false;
+        /**
+         * The button that pans: the left by default, which taps too. Another — the middle, as a picture or a canvas is
+         * moved — only pans, and the left then only taps.
+         */
+        kor::MouseButton panButton = kor::MouseButton::eLeft;
+        /** The pointer shown while it is over it, when it is said: a border to drag shows it can be. */
+        std::optional<PointerCursor> cursor;
 
         // Chainable: `kui::GestureOptions{}.Set...(...).Set...(...)`.
         GestureOptions& SetOpaque(bool value) { opaque = value; return *this; }
+        GestureOptions& SetPanButton(kor::MouseButton value) { panButton = value; return *this; }
+        GestureOptions& SetCursor(PointerCursor value) { cursor = value; return *this; }
         GestureOptions& SetYieldToChildren(bool value) { yieldToChildren = value; return *this; }
         GestureOptions& OnTap(std::function<void()> f) { onTap = std::move(f); return *this; }
         GestureOptions& OnTapDown(std::function<void(kor::Vec2)> f) { onTapDown = std::move(f); return *this; }
@@ -735,6 +744,14 @@ namespace kui
     KUI_API Widget ProgressBar(float value);
 
     /** @brief How a DragValue turns a drag into a number, and shows it. */
+    /** @brief The kind of number a DragValue holds: what it gives, dragged or typed, is always one of it. */
+    enum class NumberType : std::uint8_t {
+        eFloat,     ///< 32 bits: what it gives is as a float has it.
+        eDouble,    ///< 64 bits, as dragged and typed.
+        eInt,       ///< A whole number within what a 32-bit int holds: dragged a unit at a time, shown without decimals.
+        eUInt,      ///< A whole number of none or more, within what a 32-bit uint holds.
+    };
+
     struct DragValueOptions {
         float speed = 0.01f;                    ///< What dragging one unit to the right adds.
         float min = -Infinity, max = Infinity;  ///< Where the value stops.
@@ -756,6 +773,9 @@ namespace kui
         /// a distance, a count that may be 2 or 20 000, as fine near its least as far from it. For what is above
         /// nothing: from 0, or below its least above 0, it starts at the smallest it shows (a step of its decimals).
         bool logarithmic = false;
+        /// The kind of number it is: whatever is dragged or typed, what it gives is one of it — a whole number, rounded,
+        /// for eInt and eUInt (shown without decimals, whatever @ref decimals says), none or more for eUInt.
+        NumberType type = NumberType::eFloat;
 
         // Chainable: `kui::DragValueOptions{}.SetSpeed(0.1f).SetRange(0, 10)`.
         DragValueOptions& SetSpeed(float value) { speed = value; return *this; }
@@ -767,33 +787,52 @@ namespace kui
         DragValueOptions& SetTypeable(bool value) { typeable = value; return *this; }
         DragValueOptions& SetWrap(bool value) { wrap = value; return *this; }
         DragValueOptions& SetLogarithmic(bool value) { logarithmic = value; return *this; }
+        DragValueOptions& SetType(NumberType value) { type = value; return *this; }
+
+        /** @brief Whether it is a whole number. */
+        [[nodiscard]] bool Whole() const { return type == NumberType::eInt || type == NumberType::eUInt; }
+        /** @brief How many decimals it is shown with: none for a whole number. */
+        [[nodiscard]] int Shown() const { return Whole() ? 0 : decimals; }
 
         /** @brief What it is when dragged @p travelled units from @p from: added to, or — logarithmic — multiplied. Not kept to its range. */
-        [[nodiscard]] float Dragged(const float from, const float travelled) const {
+        [[nodiscard]] double Dragged(const double from, const double travelled) const {
             if (!logarithmic) return from + travelled * speed;
             // Nothing is no start for a product: the least it shows above nothing, or its least, is.
-            const float smallest = std::max(min > 0.f ? min : 0.f, std::pow(10.f, -static_cast<float>(std::max(decimals, 0))));
-            const float start = std::max(std::abs(from), smallest);
-            const float sign = from < 0.f ? -1.f : 1.f;
-            const float to = start * std::pow(1.f + std::max(speed, 1e-4f), travelled);
+            const double smallest = std::max(min > 0.f ? static_cast<double>(min) : 0.0, std::pow(10.0, -static_cast<double>(std::max(Shown(), 0))));
+            const double start = std::max(std::abs(from), smallest);
+            const double sign = from < 0.0 ? -1.0 : 1.0;
+            const double to = start * std::pow(1.0 + std::max(static_cast<double>(speed), 1e-4), travelled);
             // Dragged back below where it started from nothing: nothing again.
-            return std::abs(from) < smallest && to <= smallest && travelled < 0.f ? (min > 0.f ? min : 0.f) : sign * to;
+            return std::abs(from) < smallest && to <= smallest && travelled < 0.0 ? (min > 0.f ? min : 0.0) : sign * to;
         }
 
-        /** @brief @p value brought into the range: wrapped round it, where it wraps; kept at its ends, where not. */
-        [[nodiscard]] float Keep(const float value) const
+        /**
+         * @brief @p value brought into the range — wrapped round it, where it wraps; kept at its ends, where not — and made
+         *        its type: rounded to a whole number, within what an int or a uint holds; to a float's precision.
+         */
+        [[nodiscard]] double Keep(const double value) const
         {
-            const float span = max - min;
-            if (!wrap || !std::isfinite(min) || !std::isfinite(max) || !(span > 0.f)) return std::clamp(value, min, std::max(min, max));
-            const float into = std::fmod(value - min, span);
-            return min + (into < 0.f ? into + span : into);
+            const double low = min, high = std::max(min, max), span = high - low;
+            double kept;
+            if (!wrap || !std::isfinite(low) || !std::isfinite(high) || !(span > 0.0)) kept = std::clamp(value, low, high);
+            else {
+                const double into = std::fmod(value - low, span);
+                kept = low + (into < 0.0 ? into + span : into);
+            }
+            switch (type) {
+            case NumberType::eInt: return std::clamp(std::round(kept), std::max(std::ceil(low), -2147483648.0), std::min(std::floor(high), 2147483647.0));
+            case NumberType::eUInt: return std::clamp(std::round(kept), std::max(std::ceil(low), 0.0), std::min(std::floor(high), 4294967295.0));
+            case NumberType::eFloat: return static_cast<double>(static_cast<float>(kept));
+            case NumberType::eDouble: break;
+            }
+            return kept;
         }
     };
     /**
      * @brief A number in a field, changed by dragging across it sideways. Each unit of
      *        the drag adds DragValueOptions::speed; the value stops at its range.
      */
-    KUI_API Widget DragValue(float value, std::function<void(float)> onChanged, DragValueOptions options = {});
+    KUI_API Widget DragValue(double value, std::function<void(double)> onChanged, DragValueOptions options = {});
 
     /** @brief How a Dropdown looks. */
     struct DropdownOptions {

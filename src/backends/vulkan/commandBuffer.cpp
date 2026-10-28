@@ -11,6 +11,9 @@
 #include <ranges>
 #include <iostream>
 #include <format>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #include "buffer.h"
 #include "computePipeline.h"
@@ -1377,7 +1380,41 @@ namespace kor::vk
         _handle.writeTimestamp(stage, _timerPool, queryIndex);
     }
 
-    bool CommandBuffer::DoReadTimerTimestamps(const kor::u32 scopeCount, std::vector<double>& millisecondsOut, std::vector<double>& beginsOut)
+    namespace {
+        /**
+         * Where the device's clock and the CPU's steady clock are at one moment, in ms each, when the device can say
+         * (VK_KHR or VK_EXT_calibrated_timestamps): the CPU's being std::chrono::steady_clock's — CLOCK_MONOTONIC, or on
+         * Windows the performance counter. A profiler's timeline puts the GPU's work on the CPU's clock with it.
+         */
+        bool CalibrateClocks(const float period, double& gpuMs, double& cpuMs)
+        {
+            const auto& dispatch = VULKAN_HPP_DEFAULT_DISPATCHER;
+            const PFN_vkGetCalibratedTimestampsKHR get = dispatch.vkGetCalibratedTimestampsKHR ? dispatch.vkGetCalibratedTimestampsKHR : dispatch.vkGetCalibratedTimestampsEXT;
+            if (!get) return false;
+#ifdef _WIN32
+            constexpr VkTimeDomainKHR cpu = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_KHR;
+#else
+            constexpr VkTimeDomainKHR cpu = VK_TIME_DOMAIN_CLOCK_MONOTONIC_KHR;
+#endif
+            const VkCalibratedTimestampInfoKHR infos[2] {
+                { VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, nullptr, VK_TIME_DOMAIN_DEVICE_KHR },
+                { VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, nullptr, cpu },
+            };
+            kor::u64 stamps[2] {}, deviation = 0;
+            if (get(static_cast<VkDevice>(*Context::Device()), 2, infos, stamps, &deviation) != VK_SUCCESS) return false;
+            gpuMs = static_cast<double>(stamps[0]) * static_cast<double>(period) / 1'000'000.0;
+#ifdef _WIN32
+            LARGE_INTEGER frequency;
+            QueryPerformanceFrequency(&frequency);
+            cpuMs = static_cast<double>(stamps[1]) * 1000.0 / static_cast<double>(frequency.QuadPart);
+#else
+            cpuMs = static_cast<double>(stamps[1]) / 1'000'000.0;
+#endif
+            return true;
+        }
+    }
+
+    bool CommandBuffer::DoReadTimerTimestamps(const kor::u32 scopeCount, std::vector<double>& millisecondsOut, std::vector<double>& beginsOut, bool& cpuClockOut)
     {
         if (!_timerPool || scopeCount == 0) return false;
 
@@ -1402,6 +1439,9 @@ namespace kor::vk
         millisecondsOut.reserve(scopeCount);
         beginsOut.clear();
         beginsOut.reserve(scopeCount);
+        // Where the device's clock is against the CPU's now, when the device can say: each begin is put on the CPU's.
+        double gpuNow = 0.0, cpuNow = 0.0;
+        cpuClockOut = CalibrateClocks(_timestampPeriod, gpuNow, cpuNow);
         for (kor::u32 i = 0; i < scopeCount; ++i) {
             const kor::u64 begin = results[i * 2].ticks;
             const kor::u64 end = results[i * 2 + 1].ticks;
@@ -1409,7 +1449,8 @@ namespace kor::vk
             // scope's two reads. Report zero rather than the enormous number the subtraction gives.
             const double ticks = end >= begin ? static_cast<double>(end - begin) : 0.0;
             millisecondsOut.push_back(ticks * static_cast<double>(_timestampPeriod) / 1'000'000.0);
-            beginsOut.push_back(static_cast<double>(begin) * static_cast<double>(_timestampPeriod) / 1'000'000.0);
+            const double beginMs = static_cast<double>(begin) * static_cast<double>(_timestampPeriod) / 1'000'000.0;
+            beginsOut.push_back(cpuClockOut ? cpuNow - (gpuNow - beginMs) : beginMs);
         }
         return true;
     }

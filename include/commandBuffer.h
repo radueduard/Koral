@@ -1685,6 +1685,7 @@ namespace kor
         struct TimerScope {
             std::string label;
             kor::u32 depth = 0;
+            kor::u8 work = 0;       ///< What the commands recorded inside it did, as TimerWork bits.
             /// Where BeginTimer was called, so that a scope left open is blamed on the line that
             /// opened it rather than on End(), which is only where it was noticed.
             std::source_location where;
@@ -1700,11 +1701,12 @@ namespace kor
          * @brief Backend hook: read back the previous submission's timestamps, without blocking.
          * @param scopeCount How many scopes that submission recorded; slots 2i and 2i+1 bound scope i.
          * @param millisecondsOut Filled with one duration per scope, in scope order.
-         * @param beginsOut Filled with when each scope began, in ms on the device's clock, in scope order.
+         * @param beginsOut Filled with when each scope began, in ms, in scope order.
+         * @param cpuClockOut Set when @p beginsOut is on the CPU's steady clock; else it is on the device's own.
          * @return false if the GPU has not finished with them, in which case nothing is reported
          *         and the previous results stand.
          */
-        virtual bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut, std::vector<double>& beginsOut) { return false; }
+        virtual bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut, std::vector<double>& beginsOut, bool& cpuClockOut) { return false; }
 
         /**
          * @brief Fetches the last submission's timestamps if the GPU has finished with them.

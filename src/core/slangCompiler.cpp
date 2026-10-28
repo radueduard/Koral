@@ -5,6 +5,7 @@
 #include "slangCompiler.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <format>
 #include <fstream>
@@ -94,7 +95,7 @@ namespace kor
     namespace
     {
         constexpr std::uint32_t CacheMagic = 0x4b534c43;    // "KSLC"
-        constexpr std::uint32_t CacheVersion = 1;
+        constexpr std::uint32_t CacheVersion = 2;     // 2: push constants' defaults and attributes
 
         std::filesystem::path cacheDirectory()
         {
@@ -152,6 +153,125 @@ namespace kor
             }
         };
 
+        /** The source with its comments made spaces: what is looked through for what is written, where it is. */
+        std::string withoutComments(std::string text)
+        {
+            for (std::size_t i = 0; i + 1 < text.size(); ++i) {
+                if (text[i] == '/' && text[i + 1] == '/') {
+                    for (; i < text.size() && text[i] != '\n'; ++i) text[i] = ' ';
+                } else if (text[i] == '/' && text[i + 1] == '*') {
+                    for (; i + 1 < text.size() && !(text[i] == '*' && text[i + 1] == '/'); ++i)
+                        if (text[i] != '\n') text[i] = ' ';
+                    if (i + 1 < text.size()) text[i] = text[i + 1] = ' ';
+                }
+            }
+            return text;
+        }
+
+        bool isWord(const char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
+
+        /** Where the bracket that closes the one at @p open is, or npos. */
+        std::size_t closing(const std::string_view text, const std::size_t open)
+        {
+            const char opens = text[open], closes = opens == '(' ? ')' : opens == '{' ? '}' : ']';
+            int depth = 0;
+            for (std::size_t i = open; i < text.size(); ++i) {
+                if (text[i] == opens) ++depth;
+                else if (text[i] == closes && --depth == 0) return i;
+            }
+            return std::string_view::npos;
+        }
+
+        /** Where @p word is in @p text as a word of its own, from @p from; npos when not. */
+        std::size_t findWord(const std::string_view text, const std::string_view word, std::size_t from = 0)
+        {
+            for (std::size_t at = text.find(word, from); at != std::string_view::npos; at = text.find(word, at + 1))
+                if ((at == 0 || !isWord(text[at - 1])) && (at + word.size() >= text.size() || !isWord(text[at + word.size()]))) return at;
+            return std::string_view::npos;
+        }
+
+        /** The parameters of the function @p name defines, between its brackets: not where it is called. */
+        std::string_view parametersOf(const std::string_view text, const std::string_view name)
+        {
+            for (std::size_t at = findWord(text, name); at != std::string_view::npos; at = findWord(text, name, at + 1)) {
+                std::size_t open = at + name.size();
+                while (open < text.size() && std::isspace(static_cast<unsigned char>(text[open]))) ++open;
+                if (open >= text.size() || text[open] != '(') continue;
+                const std::size_t close = closing(text, open);
+                if (close == std::string_view::npos) return {};
+                // Defined, not called: its body follows, after a semantic of what it returns if it has one.
+                std::size_t after = close + 1;
+                while (after < text.size() && text[after] != '{' && text[after] != ';' && text[after] != ')') ++after;
+                if (after < text.size() && text[after] == '{') return text.substr(open + 1, close - open - 1);
+            }
+            return {};
+        }
+
+        /** The body of the struct @p name. */
+        std::string_view bodyOf(const std::string_view text, const std::string_view name)
+        {
+            for (std::size_t at = findWord(text, "struct"); at != std::string_view::npos; at = findWord(text, "struct", at + 1)) {
+                std::size_t word = at + 6;
+                while (word < text.size() && std::isspace(static_cast<unsigned char>(text[word]))) ++word;
+                if (text.substr(word, name.size()) != name || (word + name.size() < text.size() && isWord(text[word + name.size()]))) continue;
+                const std::size_t open = text.find_first_of("{;", word);
+                if (open == std::string_view::npos || text[open] != '{') continue;
+                const std::size_t close = closing(text, open);
+                if (close == std::string_view::npos) return {};
+                return text.substr(open + 1, close - open - 1);
+            }
+            return {};
+        }
+
+        /**
+         * The default @p name is declared with in @p scope, as @p components numbers: written as numbers — `1.5`,
+         * `float4(1, 0.5, 0, 1)`, `float3(1)` (one for each), `{ 1, 2 }`, `true` — and nothing otherwise.
+         */
+        std::vector<double> literalDefault(const std::string_view scope, const std::string_view name, const std::size_t components)
+        {
+            for (std::size_t at = findWord(scope, name); at != std::string_view::npos; at = findWord(scope, name, at + 1)) {
+                std::size_t i = at + name.size();
+                while (i < scope.size() && std::isspace(static_cast<unsigned char>(scope[i]))) ++i;
+                if (i >= scope.size() || scope[i] != '=' || (i + 1 < scope.size() && scope[i + 1] == '=')) continue;
+                ++i;
+                while (i < scope.size() && std::isspace(static_cast<unsigned char>(scope[i]))) ++i;
+                // A type made of its numbers, or a list of them, or one number.
+                std::size_t start = i;
+                while (i < scope.size() && isWord(scope[i]) && !std::isdigit(static_cast<unsigned char>(scope[start]))) ++i;
+                std::string_view listed;
+                if (i < scope.size() && (scope[i] == '(' || scope[i] == '{') && (i > start || scope[i] == '{')) {
+                    const std::size_t close = closing(scope, i);
+                    if (close == std::string_view::npos) return {};
+                    listed = scope.substr(i + 1, close - i - 1);
+                } else {
+                    i = start;
+                    const std::size_t end = scope.find_first_of(",;)}", i);
+                    listed = scope.substr(i, end == std::string_view::npos ? std::string_view::npos : end - i);
+                }
+                std::vector<double> numbers;
+                std::size_t from = 0;
+                while (from <= listed.size()) {
+                    const std::size_t comma = listed.find(',', from);
+                    std::string number(listed.substr(from, comma == std::string_view::npos ? std::string_view::npos : comma - from));
+                    std::erase_if(number, [](const char c) { return std::isspace(static_cast<unsigned char>(c)); });
+                    if (number == "true" || number == "false") numbers.push_back(number == "true" ? 1.0 : 0.0);
+                    else {
+                        while (!number.empty() && std::string_view("fFhHuUlL").find(number.back()) != std::string_view::npos) number.pop_back();
+                        char* end = nullptr;
+                        const double n = number.empty() ? 0.0 : std::strtod(number.c_str(), &end);
+                        if (number.empty() || end != number.c_str() + number.size()) return {};   // worked out, not written
+                        numbers.push_back(n);
+                    }
+                    if (comma == std::string_view::npos) break;
+                    from = comma + 1;
+                }
+                if (numbers.size() == 1 && components > 1) numbers.assign(components, numbers.front());
+                if (numbers.size() != components) return {};
+                return numbers;
+            }
+            return {};
+        }
+
         std::string serialize(const SlangCompileResult& result)
         {
             Out out;
@@ -176,6 +296,19 @@ namespace kor
             for (const auto& [path, kind] : result.pushHandles) { out.text(path); out.put(static_cast<std::uint8_t>(kind)); }
             out.put<std::uint64_t>(result.entryParameters.size());
             for (const auto& name : result.entryParameters) out.text(name);
+            out.put<std::uint64_t>(result.pushAnnotations.size());
+            for (const auto& [path, annotation] : result.pushAnnotations) {
+                out.text(path);
+                out.put<std::uint8_t>(annotation.declaresInitial ? 1 : 0);
+                out.put<std::uint64_t>(annotation.initial.size());
+                for (const double n : annotation.initial) out.put(n);
+                out.put<std::uint64_t>(annotation.attributes.size());
+                for (const auto& attribute : annotation.attributes) {
+                    out.text(attribute.name);
+                    out.put<std::uint64_t>(attribute.numbers.size());
+                    for (const double n : attribute.numbers) out.put(n);
+                }
+            }
             return std::move(out.bytes);
         }
 
@@ -214,6 +347,18 @@ namespace kor
                 result.pushHandles.emplace(std::move(path), static_cast<BindlessKind>(in.get<std::uint8_t>()));
             }
             for (auto count = in.get<std::uint64_t>(); in.ok && count > 0; --count) result.entryParameters.insert(in.text());
+            for (auto count = in.get<std::uint64_t>(); in.ok && count > 0; --count) {
+                std::string path = in.text();
+                Shader::Annotation annotation;
+                annotation.declaresInitial = in.get<std::uint8_t>() != 0;
+                for (auto numbers = in.get<std::uint64_t>(); in.ok && numbers > 0; --numbers) annotation.initial.push_back(in.get<double>());
+                for (auto attributes = in.get<std::uint64_t>(); in.ok && attributes > 0; --attributes) {
+                    Shader::Attribute attribute { in.text(), {} };
+                    for (auto numbers = in.get<std::uint64_t>(); in.ok && numbers > 0; --numbers) attribute.numbers.push_back(in.get<double>());
+                    annotation.attributes.push_back(std::move(attribute));
+                }
+                result.pushAnnotations.emplace(std::move(path), std::move(annotation));
+            }
             if (!in.ok) return std::nullopt;
             return result;
         }
@@ -463,6 +608,74 @@ namespace kor
                     result.entryParameters.emplace(parameter->getName());
                     slang::TypeReflection* declared = parameter->getVariable() ? parameter->getVariable()->getType() : nullptr;
                     if (const auto kind = kindOf(declared)) { result.pushHandles.emplace(parameter->getName(), *kind); continue; }
+                    collect(collect, parameter->getTypeLayout(), std::string(parameter->getName()) + ".");
+                }
+            }
+        }
+
+        // The defaults push constants are declared with, and their attributes: what a tool shows them to be set with.
+        //
+        // Slang gives a scalar's default. A vector's it says there is and cannot give, so that one is read from the
+        // source — where the entry point lists it, or its struct declares it — when it is written as numbers. One worked
+        // out (`= speed * 2`) is said to be there, and not read. Paths are spelled as pushHandles' are.
+        if (slang::ProgramLayout* layout = linked->getLayout(0, diagnostics.writeRef())) {
+            std::string source;
+            if (const char* filePath = slangModule->getFilePath()) {
+                std::ifstream file(filePath, std::ios::binary);
+                source = withoutComments(std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()));
+            }
+            const auto annotate = [&](slang::VariableLayoutReflection* field, const std::string& path, const std::string_view scope) {
+                slang::VariableReflection* variable = field->getVariable();
+                if (!variable) return;
+                Shader::Annotation annotation;
+                for (unsigned a = 0; a < variable->getUserAttributeCount(); ++a) {
+                    slang::UserAttribute* attribute = variable->getUserAttributeByIndex(a);
+                    if (!attribute || !attribute->getName()) continue;
+                    Shader::Attribute read { attribute->getName(), {} };
+                    for (unsigned i = 0; i < attribute->getArgumentCount(); ++i) {
+                        float f = 0.f;
+                        int n = 0;
+                        if (SLANG_SUCCEEDED(attribute->getArgumentValueFloat(i, &f))) read.numbers.push_back(f);
+                        else if (SLANG_SUCCEEDED(attribute->getArgumentValueInt(i, &n))) read.numbers.push_back(n);
+                    }
+                    annotation.attributes.push_back(std::move(read));
+                }
+                if (variable->hasDefaultValue()) {
+                    annotation.declaresInitial = true;
+                    slang::TypeLayoutReflection* type = field->getTypeLayout();
+                    const auto kind = type ? type->getKind() : slang::TypeReflection::Kind::None;
+                    float f = 0.f;
+                    int64_t n = 0;
+                    if (kind == slang::TypeReflection::Kind::Scalar && SLANG_SUCCEEDED(variable->getDefaultValueFloat(&f))) annotation.initial = { f };
+                    else if (kind == slang::TypeReflection::Kind::Scalar && SLANG_SUCCEEDED(variable->getDefaultValueInt(&n))) annotation.initial = { static_cast<double>(n) };
+                    else if (kind == slang::TypeReflection::Kind::Scalar) annotation.initial = literalDefault(scope, variable->getName(), 1);
+                    else if (kind == slang::TypeReflection::Kind::Vector) annotation.initial = literalDefault(scope, variable->getName(), type->getElementCount());
+                }
+                if (annotation.declaresInitial || !annotation.attributes.empty()) result.pushAnnotations[path] = std::move(annotation);
+            };
+            const auto collect = [&](auto&& self, slang::TypeLayoutReflection* typeLayout, const std::string& prefix) -> void {
+                while (typeLayout && (typeLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer ||
+                                      typeLayout->getKind() == slang::TypeReflection::Kind::ParameterBlock))
+                    typeLayout = typeLayout->getElementTypeLayout();
+                if (!typeLayout || typeLayout->getKind() != slang::TypeReflection::Kind::Struct) return;
+                const std::string_view body = typeLayout->getName() ? bodyOf(source, typeLayout->getName()) : std::string_view {};
+                for (unsigned f = 0; f < typeLayout->getFieldCount(); ++f) {
+                    slang::VariableLayoutReflection* field = typeLayout->getFieldByIndex(f);
+                    if (!field || !field->getName()) continue;
+                    const std::string path = prefix + field->getName();
+                    annotate(field, path, body);
+                    self(self, field->getTypeLayout(), path + ".");
+                }
+            };
+            for (unsigned i = 0; i < layout->getParameterCount(); ++i)
+                if (slang::VariableLayoutReflection* parameter = layout->getParameterByIndex(i))
+                    collect(collect, parameter->getTypeLayout(), "");
+            if (slang::EntryPointReflection* ep = layout->getEntryPointByIndex(0)) {
+                const std::string_view listed = parametersOf(source, entry);
+                for (unsigned p = 0; p < ep->getParameterCount(); ++p) {
+                    slang::VariableLayoutReflection* parameter = ep->getParameterByIndex(p);
+                    if (!parameter || !parameter->getName()) continue;
+                    annotate(parameter, parameter->getName(), listed);
                     collect(collect, parameter->getTypeLayout(), std::string(parameter->getName()) + ".");
                 }
             }

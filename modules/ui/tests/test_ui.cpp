@@ -848,6 +848,17 @@ TEST(DragValueOptions, WrappingBringsAValueRoundIntoItsRangeAndClampingKeepsItAt
     EXPECT_FLOAT_EQ(kui::DragValueOptions {}.SetRange(-1.f, 1.f).SetWrap(true).Keep(1.5f), -0.5f);
     EXPECT_FLOAT_EQ(kui::DragValueOptions {}.SetRange(0.f, 360.f).Keep(370.f), 360.f) << "not wrapping, it stops at the end";
     EXPECT_FLOAT_EQ(kui::DragValueOptions {}.SetRange(0.f, kui::Infinity).SetWrap(true).Keep(-5.f), 0.f) << "an open range does not wrap";
+
+    // Whatever is dragged or typed, what it gives is of its type: a whole number of an int, none or more of a uint.
+    using kui::NumberType;
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eInt).Keep(2.6), 3.0);
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eInt).Keep(-2.6), -3.0);
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eUInt).Keep(-4.0), 0.0);
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eUInt).Keep(5e10), 4294967295.0);
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eInt).SetRange(0.5f, 3.5f).Keep(3.4), 3.0) << "the whole numbers within its range";
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eFloat).Keep(0.1), static_cast<double>(0.1f));
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eDouble).Keep(0.1), 0.1);
+    EXPECT_EQ(kui::DragValueOptions {}.SetType(NumberType::eInt).SetDecimals(3).Shown(), 0) << "a whole number is shown without decimals";
 }
 
 TEST_F(WidgetTest, ADragValueThatWrapsComesBackInAtTheOtherEnd) {
@@ -3290,4 +3301,35 @@ TEST(Menus, ASubmenuOpensBesideItsLineAndPickingInItClosesThemAll) {
     EXPECT_FALSE(shows("Delete"));
     s_app->Close(*scene);
     settle();
+}
+
+// A pan of another button: the middle drags, as a picture is moved, and the left then only taps.
+TEST_F(WidgetTest, AGestureCanPanWithTheMiddleButton) {
+    auto& input = scene->SceneInput();
+    kor::Vec2 moved { 0.f };
+    int taps = 0;
+    kui::GestureOptions gestures;
+    gestures.SetPanButton(kor::MouseButton::eMiddle).SetCursor(kui::PointerCursor::eHand);
+    gestures.onPanUpdate = [&](const kor::Vec2 delta, kor::Vec2) { moved += delta; };
+    gestures.onTap = [&] { ++taps; };
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::GestureDetector(gestures, kui::SizedBox(100.f, 100.f))));
+    const auto drag = [&](const kor::MouseButton button) {
+        input.FeedMousePosition({ 20.f, 20.f });
+        settle();
+        input.FeedMouseButton(button, true);
+        settle();
+        input.FeedMousePosition({ 60.f, 30.f });
+        input.FeedMouseDelta({ 40.f, 10.f });
+        settle();
+        input.FeedMouseButton(button, false);
+        settle(); settle();
+    };
+    drag(kor::MouseButton::eMiddle);
+    EXPECT_GT(moved.x, 30.f) << "the middle pans";
+    EXPECT_EQ(taps, 0) << "and does not tap";
+    const kor::Vec2 before = moved;
+    drag(kor::MouseButton::eLeft);
+    EXPECT_EQ(moved, before) << "the left does not pan";
+    Click({ 20.f, 20.f });
+    EXPECT_GE(taps, 1) << "the left taps";
 }

@@ -846,10 +846,10 @@ class RenderTextField final : public RenderContainer {
 
         // ---- drag value -----------------------------------------------------------------------------------
 
-        std::string formatted(const float value, const int decimals)
+        std::string formatted(const double value, const int decimals)
         {
             char text[64];
-            std::snprintf(text, sizeof text, "%.*f", std::clamp(decimals, 0, 9), static_cast<double>(value));
+            std::snprintf(text, sizeof text, "%.*f", std::clamp(decimals, 0, 9), value);
             return text;
         }
 
@@ -857,8 +857,8 @@ class RenderTextField final : public RenderContainer {
         class RenderDragValue final : public RenderContainer {
         public:
             struct Config {
-                float value = 0.f;
-                std::function<void(float)> onChanged;
+                double value = 0.0;
+                std::function<void(double)> onChanged;
                 DragValueOptions options;
                 /**
                  * To be typed in: double-clicked, or given the keyboard (Tab) — with the size it is laid out at.
@@ -869,7 +869,7 @@ class RenderTextField final : public RenderContainer {
 
             void Set(const Config& c)
             {
-                const bool look = c.value != _config.value || c.options.label != _config.options.label || c.options.decimals != _config.options.decimals;
+                const bool look = c.value != _config.value || c.options.label != _config.options.label || c.options.Shown() != _config.options.Shown();
                 _config = c;
                 // As wide as what it shows needs, where no width is given: which a longer number changes.
                 const kor::Vec2 wanted = Wanted();
@@ -884,7 +884,7 @@ class RenderTextField final : public RenderContainer {
             [[nodiscard]] bool Focusable() const override { return static_cast<bool>(_config.onEdit); }
             [[nodiscard]] std::string DebugText() const override
             {
-                const std::string value = formatted(_config.value, _config.options.decimals);
+                const std::string value = formatted(_config.value, _config.options.Shown());
                 return _config.options.label.empty() ? value : _config.options.label + " " + value;
             }
 
@@ -917,7 +917,7 @@ class RenderTextField final : public RenderContainer {
                     if (!_held) { _held = true; if (const Owner* owner = GetOwner(); owner && owner->lockPointer) owner->lockPointer(true); }
                     // From where it was pressed, not step by step: the value does not drift when it is held at a limit.
                     _travelled += Upright() ? -event.delta.y : event.delta.x;
-                    const float value = _config.options.Keep(_config.options.Dragged(_from, _travelled));
+                    const double value = _config.options.Keep(_config.options.Dragged(_from, _travelled));
                     if (value != _config.value && _config.onChanged) _config.onChanged(value);
                     return true;   // a drag on it is its own
                 }
@@ -961,7 +961,7 @@ class RenderTextField final : public RenderContainer {
                     canvas.DrawLine({ x, box.bottom - 9.f }, { x + 4.f, box.bottom - 13.f }, arrow);
                     TextStyle style = t.textStyle;
                     style.color = t.text;
-                    const std::string value = formatted(_config.value, _config.options.decimals);
+                    const std::string value = formatted(_config.value, _config.options.Shown());
                     const Paragraph number(value, style);
                     float top = box.top + UprightArrow;
                     if (!_config.options.label.empty()) {
@@ -977,7 +977,7 @@ class RenderTextField final : public RenderContainer {
                 const float y = box.Center().y;
                 TextStyle style = t.textStyle;
                 style.color = t.text;
-                const std::string value = formatted(_config.value, _config.options.decimals);
+                const std::string value = formatted(_config.value, _config.options.Shown());
                 const Paragraph number(value, style);
 
                 // Squeezed narrower than the arrows and the number need — three of them side by side in a
@@ -1045,11 +1045,11 @@ class RenderTextField final : public RenderContainer {
             {
                 const auto& o = _config.options;
                 const TextStyle style = Theme::Current().textStyle;
-                const Paragraph shown(formatted(_config.value, o.decimals), style);
+                const Paragraph shown(formatted(_config.value, o.Shown()), style);
                 float number = shown.Size().x;
                 for (const float end : { o.min, o.max }) {
                     const float widest = std::isfinite(end) && std::abs(end) < 1.e9f ? end : (end < 0.f ? -8888.f : 8888.f);
-                    number = std::max(number, Paragraph(formatted(widest, o.decimals), style).Size().x);
+                    number = std::max(number, Paragraph(formatted(widest, o.Shown()), style).Size().x);
                 }
                 if (Upright()) {
                     const kor::Vec2 label = o.label.empty() ? kor::Vec2(0.f) : Paragraph(o.label, style).Size();
@@ -1078,7 +1078,8 @@ class RenderTextField final : public RenderContainer {
             Config _config;
             kor::Vec2 _wanted { 120.f, 36.f };
             float _minWidth = 0.f;      ///< Content's width, worked out with _wanted.
-            float _from = 0.f, _travelled = 0.f;
+            double _from = 0.0;
+            float _travelled = 0.f;
             bool _dragging = false, _hovered = false;
             bool _held = false;     ///< Whether it has the pointer held in place: from the first move of a drag to its end.
             std::optional<std::chrono::steady_clock::time_point> _lastClick;    ///< The click a second one would make a double click of.
@@ -1092,14 +1093,14 @@ class RenderTextField final : public RenderContainer {
         };
 
         /** A number typed: what it says, spaces round it and a decimal comma allowed; none where it is no number. */
-        std::optional<float> parsedNumber(std::string text)
+        std::optional<double> parsedNumber(std::string text)
         {
             std::ranges::replace(text, ',', '.');
             const auto first = text.find_first_not_of(" \t"), last = text.find_last_not_of(" \t");
             if (first == std::string::npos) return std::nullopt;
             text = text.substr(first, last - first + 1);
             char* end = nullptr;
-            const float value = std::strtof(text.c_str(), &end);
+            const double value = std::strtod(text.c_str(), &end);
             if (end != text.c_str() + text.size() || !std::isfinite(value)) return std::nullopt;
             return value;
         }
@@ -1126,7 +1127,7 @@ class RenderTextField final : public RenderContainer {
                     return Make<DragValueWidget>(std::move(drag));
                 }
                 TextFieldOptions options;
-                options.text = formatted(config.value, config.options.decimals);
+                options.text = formatted(config.value, config.options.Shown());
                 options.width = size.x;
                 options.focus = focus;
                 options.selectAllOnFocus = true;
@@ -1141,7 +1142,7 @@ class RenderTextField final : public RenderContainer {
             {
                 if (!editing || !Mounted()) return;
                 if (const auto typed = parsedNumber(text)) {
-                    const float value = config.options.Keep(*typed);
+                    const double value = config.options.Keep(*typed);
                     if (value != config.value && config.onChanged) config.onChanged(value);
                 }
                 SetState([&] { editing = false; });
@@ -1743,8 +1744,9 @@ class RenderTextField final : public RenderContainer {
 
     Widget TextField(TextFieldOptions options) { return Make<TextFieldWidget>(std::move(options)); }
 
-    Widget DragValue(const float value, std::function<void(float)> onChanged, DragValueOptions options)
+    Widget DragValue(const double given, std::function<void(double)> onChanged, DragValueOptions options)
     {
+        const double value = options.Whole() ? std::round(given) : given;     // shown as what it is: an Int's whole
         const bool typeable = options.typeable;
         RenderDragValue::Config config { value, std::move(onChanged), std::move(options) };
         if (typeable) return Make<TypeableDragValue>(std::move(config));

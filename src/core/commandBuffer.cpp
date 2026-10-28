@@ -206,6 +206,20 @@ namespace kor
     // earlier in the frame), and Vulkan forbids a layout transition inside a render pass. Holding
     // the commands lets the resolver insert the barrier at a legal point instead of breaking the
     // pass apart.
+    namespace {
+        /** What a command does, as TimerWork bits, by its name: every command is enqueued under one. */
+        kor::u8 WorkOf(const std::string_view command)
+        {
+            if (command.starts_with("Draw")) return TimerWork::Draw;
+            if (command.starts_with("Dispatch")) return TimerWork::Dispatch;
+            if (command.starts_with("TraceRays")) return TimerWork::Rays;
+            if (command == "CopyDescriptors") return 0;
+            for (const std::string_view transfer : { "Copy", "Blit", "Resolve", "Fill", "Clear", "Update" })
+                if (command.starts_with(transfer)) return TimerWork::Transfer;
+            return 0;
+        }
+    }
+
     CommandBuffer& CommandBuffer::Enqueue(const char* command, const std::source_location where,
                                           std::vector<ResourceUse> uses, const PassEdge pass,
                                           std::function<void()> emit, const bool transitions,
@@ -228,6 +242,10 @@ namespace kor
             emit();
             return *this;
         }
+        // What the timer scopes open around it did: a profiler colours a pass by it.
+        if (!_timerStack.empty())
+            if (const kor::u8 work = WorkOf(command))
+                for (const auto scope : _timerStack) _pendingTimers[scope].work |= work;
         _records.push_back(Record{
             .emit = std::move(emit),
             .uses = std::move(uses),
@@ -1289,9 +1307,10 @@ namespace kor
         if (_submittedTimers.empty()) return !_timings.empty();
 
         std::vector<double> milliseconds, begins;
+        bool cpuClock = false;
         // Not ready is not an error — the results simply stay as they were, which keeps a
         // profiler's readings steady instead of flickering to nothing.
-        if (!DoReadTimerTimestamps(static_cast<kor::u32>(_submittedTimers.size()), milliseconds, begins)
+        if (!DoReadTimerTimestamps(static_cast<kor::u32>(_submittedTimers.size()), milliseconds, begins, cpuClock)
             || milliseconds.size() != _submittedTimers.size() || begins.size() != _submittedTimers.size())
             return false;
 
@@ -1302,6 +1321,8 @@ namespace kor
                 .label = _submittedTimers[i].label,
                 .milliseconds = milliseconds[i],
                 .beginMs = begins[i],
+                .cpuClock = cpuClock,
+                .work = _submittedTimers[i].work,
                 .depth = _submittedTimers[i].depth,
             });
         }

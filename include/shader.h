@@ -222,6 +222,29 @@ namespace kor
             std::map<kor::u32, Descriptor> descriptors; ///< Keyed by binding number.
         };
 
+        /** @brief A user attribute a Slang declaration carries: `[Range(0, 50)]` is "Range" with 0 and 50. */
+        struct KORAL_API Attribute
+        {
+            std::string name;
+            std::vector<double> numbers;    ///< Its arguments that are numbers, in order.
+        };
+
+        /**
+         * @brief What a Slang shader says of a push constant beyond its type, for a tool that shows it to be set.
+         *
+         * The default it is declared with — `uniform float speed = 10`, `float4 tint = float4(1, 0.5, 0, 1)` — and its
+         * attributes. What an attribute means is the reader's: the shader declares it (`[__AttributeUsage]`), and Koral
+         * only carries it. Nothing for SPIR-V or GLSL, which say none of it.
+         */
+        struct KORAL_API Annotation
+        {
+            /// The default, a number for each component (a bool's 0 or 1); empty when it has none, or one that is not
+            /// written as numbers (`= speed * 2`), which @ref declaresInitial still tells of.
+            std::vector<double> initial;
+            bool declaresInitial = false;
+            std::vector<Attribute> attributes;
+        };
+
         /**
          * @brief One addressable thing inside a push-constant block.
          *
@@ -254,6 +277,9 @@ namespace kor
             /// An entry point's `uniform` parameter (Slang's `uniform Push push`): its fields are also found by
             /// their own names. @see Pipeline::FindPushConstant
             bool parameter = false;
+
+            /// Its default and its attributes, as a Slang shader declares them. @see Annotation
+            Annotation annotation;
 
             /// @ref handle for a handle to a descriptor no bindless table holds: a texel buffer, a combined sampler.
             static constexpr kor::u8 NoTable = 0xFF;
@@ -633,6 +659,9 @@ namespace kor
         /// Push-constant path -> kor::BindlessKind (as a byte) of a Slang `T.Handle` there. Only Slang
         /// knows a handle from a uint2. @see PushConstantField::handle
         std::map<std::string, kor::u8> _pushHandles;
+
+        /// Push-constant path -> its default and attributes (Slang). @see PushConstantField::annotation
+        std::map<std::string, Annotation> _pushAnnotations;
 
         /// The entry point's parameter names (Slang). @see PushConstantField::parameter
         std::set<std::string> _entryParameters;

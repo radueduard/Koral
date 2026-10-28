@@ -304,6 +304,7 @@ namespace kui
     private:
         GestureOptions _options;
         bool _pressed = false, _panning = false;
+        kor::MouseButton _button = kor::MouseButton::eLeft;     // the press's: what its moves and its letting go are of
         kor::Vec2 _down {};
     };
 }

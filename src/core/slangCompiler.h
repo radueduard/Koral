@@ -47,6 +47,11 @@ namespace kor
         /// The entry point's parameters, by name: a `uniform Push push` reaches the push constants as a struct
         /// member "push" that is the shader's way of passing values in, not a struct of the block's own.
         std::set<std::string> entryParameters;
+
+        /// Push-constant path -> its default and its attributes, spelled as @ref pushHandles are. Defaults of
+        /// scalars come from Slang's reflection; of vectors, which it cannot give, from the source, where they are
+        /// written as numbers.
+        std::map<std::string, Shader::Annotation> pushAnnotations;
     };
 
     // Thin wrapper over the Slang in-process compiler. Compiles a single entry point of a

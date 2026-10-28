@@ -212,6 +212,7 @@ namespace kor
             bool aggregate = false;     ///< A struct or an array of structs: writable only as raw bytes.
             kor::u8 handle = 0;         ///< A Slang `T.Handle`: the kor::BindlessKind it indexes, as a byte; 0 otherwise.
             bool parameter = false;     ///< An entry point's `uniform` parameter: its fields are found by their own names too.
+            Shader::Annotation annotation;  ///< Its default and attributes, as a Slang shader declares them: the first stage's that says any.
         };
 
         /**

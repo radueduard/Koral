@@ -414,6 +414,9 @@ namespace kor::vk {
             }
         }
         if (fifoLatestReady) deviceExtensions.push_back(fifoLatestReady);
+        // A profiler's timeline puts the GPU's times on the CPU's clock, where the device can say how the two line up.
+        if (physicalDevice.supportsExtension("VK_KHR_calibrated_timestamps")) deviceExtensions.push_back("VK_KHR_calibrated_timestamps");
+        else if (physicalDevice.supportsExtension("VK_EXT_calibrated_timestamps")) deviceExtensions.push_back("VK_EXT_calibrated_timestamps");
         if (_supportsPresentFences) deviceExtensions.push_back(VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
         if (_enabledFeatures & (Feature::eAtomicFloat32 | Feature::eAtomicFloat64)) deviceExtensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
         if (_enabledFeatures & Feature::eCooperativeMatrix) deviceExtensions.push_back(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);

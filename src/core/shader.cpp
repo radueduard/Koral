@@ -404,6 +404,7 @@ namespace kor {
             _pushHandles.clear();                           // `T.Handle` push constants
             for (const auto& [path, kind] : result.pushHandles)   // a handle to a kind with no table: PushConstantField::NoTable
                 _pushHandles.emplace(path, kind == BindlessKind::eNone ? PushConstantField::NoTable : static_cast<kor::u8>(kind));
+            _pushAnnotations = std::move(result.pushAnnotations);   // defaults and attributes
             _inputSemantics.clear();                        // `: SEMANTIC` on the stage inputs
             for (auto& [location, annotation] : result.varyingSemantics) {
                 _inputSemantics.emplace(location, FieldSemantic{ std::move(annotation.moduleName),
@@ -816,6 +817,8 @@ namespace kor {
     		field.parameter = prefix.empty() && _entryParameters.contains(name);
     		if (const auto handle = _pushHandles.find(name); handle != _pushHandles.end())
     			field.handle = handle->second;   // its array elements copy it below
+    		if (const auto annotation = _pushAnnotations.find(name); annotation != _pushAnnotations.end())
+    			field.annotation = annotation->second;
 
     		const bool isArray = !memberType.array.empty();
     		const bool isStruct = memberType.basetype == spirv_cross::SPIRType::Struct;

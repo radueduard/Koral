@@ -24,7 +24,10 @@
 #include "window.h"
 #include "frameGraphCompiler.h"
 
+#include <deque>
 #include <limits>
+#include <mutex>
+#include <thread>
 
 namespace kor {
     struct PassBuilder::Impl {
@@ -323,10 +326,26 @@ namespace kor {
         std::array<float, History> frameMs {};   // CPU frame time, a ring
         std::array<float, History> gpuMs {};     // the graph's GPU time, a ring
         std::size_t next = 0;
-        // When each pass last began on the GPU, on the device's clock, and in which frame: what PassTimings makes a
-        // timeline of. Frames are counted as they are recorded.
-        struct Began { double at = 0.0, ms = 0.0; std::uint64_t frame = 0; };
-        std::map<std::string, Began, std::less<>> began;
+        // The last frames as they went, pass by pass: when each was prepared and recorded on the CPU, on which thread,
+        // and — once the GPU has run it, a few frames later — when it ran there and what it did. What PassTimings makes
+        // a timeline of. Frames are counted as they are recorded; the GPU's results come from other threads.
+        struct PassTrace {
+            double prepareAt = -1.0, prepareMs = 0.0, recordAt = -1.0, recordMs = 0.0;
+            int thread = -1;
+            bool onCpu = false;
+            double gpuAt = -1.0, gpuMs = 0.0;
+            bool gpuCpuClock = false;
+            kor::u8 work = 0;
+        };
+        struct FrameTrace {
+            std::uint64_t frame = 0;
+            double startMs = 0.0;   // on the steady clock, as each CPU time is
+            std::map<std::string, PassTrace, std::less<>> passes;
+        };
+        static constexpr std::size_t Traced = 8;
+        std::mutex traceMutex;
+        std::deque<FrameTrace> traces;
+        std::map<std::thread::id, int> threads;     // a lane for each thread that has recorded a pass: 0 the main thread's
         std::uint64_t frames = 0;
     };
 
@@ -335,19 +354,32 @@ namespace kor {
 
     std::vector<FrameGraph::PassTiming> FrameGraph::PassTimings() const {
         std::vector<PassTiming> out;
-        // The newest frame any pass was measured in, and when the first of its passes began: each start is from that.
-        std::uint64_t frame = 0;
-        for (const RenderPass* pass : _order)
-            if (const auto it = _stats->began.find(pass->Name()); it != _stats->began.end()) frame = std::max(frame, it->second.frame);
-        double first = std::numeric_limits<double>::max();
-        for (const RenderPass* pass : _order)
-            if (const auto it = _stats->began.find(pass->Name()); it != _stats->began.end() && it->second.frame == frame) first = std::min(first, it->second.at);
+        std::lock_guard lock(_stats->traceMutex);
+        // The newest frame the GPU has said anything of — else the newest there is — on one timeline: from when the
+        // frame started on the CPU, or, where the GPU's clock cannot be put on the CPU's, its passes from its first.
+        const Stats::FrameTrace* trace = nullptr;
+        for (auto it = _stats->traces.rbegin(); it != _stats->traces.rend() && !trace; ++it)
+            if (std::ranges::any_of(it->passes | std::views::values, [](const Stats::PassTrace& pass) { return pass.gpuAt >= 0.0; })) trace = &*it;
+        if (!trace && !_stats->traces.empty()) trace = &_stats->traces.back();
+        double firstGpu = std::numeric_limits<double>::max();
+        if (trace)
+            for (const auto& pass : trace->passes | std::views::values)
+                if (pass.gpuAt >= 0.0 && !pass.gpuCpuClock) firstGpu = std::min(firstGpu, pass.gpuAt);
         for (const RenderPass* pass : _order)
             if (const auto it = _stats->passes.find(pass->Name()); it != _stats->passes.end()) {
                 PassTiming timing = it->second;
-                if (const auto began = _stats->began.find(pass->Name()); began != _stats->began.end() && began->second.frame == frame && frame > 0) {
-                    timing.gpuStartMs = began->second.at - first;
-                    timing.gpuLastMs = began->second.ms;
+                if (const auto traced = trace ? trace->passes.find(pass->Name()) : decltype(trace->passes.end()) {}; trace && traced != trace->passes.end()) {
+                    const Stats::PassTrace& t = traced->second;
+                    if (t.prepareAt >= 0.0) { timing.cpuPrepareStartMs = t.prepareAt - trace->startMs; timing.cpuPrepareLastMs = t.prepareMs; }
+                    if (t.recordAt >= 0.0) { timing.cpuRecordStartMs = t.recordAt - trace->startMs; timing.cpuRecordLastMs = t.recordMs; }
+                    timing.recordThread = t.thread;
+                    timing.runsOnCpu = t.onCpu;
+                    if (t.gpuAt >= 0.0) {
+                        timing.gpuStartMs = t.gpuCpuClock ? t.gpuAt - trace->startMs : t.gpuAt - firstGpu;
+                        timing.gpuLastMs = t.gpuMs;
+                        timing.gpuOnCpuClock = t.gpuCpuClock;
+                        timing.work = t.work;
+                    }
                 }
                 out.push_back(std::move(timing));
             }
@@ -830,12 +862,24 @@ namespace kor {
         double millisecondsSince(const Clock::time_point start) {
             return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
         }
+        /** A moment as ms on the steady clock: what a GPU's calibrated timestamps are put on too. */
+        double millisecondsAt(const Clock::time_point at) {
+            return std::chrono::duration<double, std::milli>(at.time_since_epoch()).count();
+        }
+
+        /** When a pass ran on the CPU, for how long, and on which thread. */
+        struct CpuSpan {
+            double at = -1.0, ms = 0.0;
+            std::thread::id thread;
+        };
 
         // Runs a CPU pass, or records a GPU one inside a GPU timer scope named after it; either way
         // timing the CPU side.
         void RunTimed(RenderPass& pass, const bool onCpu, const bool async, const std::vector<ImageBarrier>& handoffs,
-                      std::unique_ptr<CommandBuffer>& out, double& ms) {
+                      std::unique_ptr<CommandBuffer>& out, CpuSpan& span) {
             const auto start = Clock::now();
+            span.at = millisecondsAt(start);
+            span.thread = std::this_thread::get_id();
             if (onCpu) {
                 static_cast<CpuPass&>(pass).Run();
             } else {
@@ -849,7 +893,7 @@ namespace kor {
                 cb->EndTimer();
                 out = std::move(cb);
             }
-            ms = millisecondsSince(start);
+            span.ms = millisecondsSince(start);
         }
 
         // Several GPU passes one after another into one command buffer, each inside its own timer scope:
@@ -857,7 +901,7 @@ namespace kor {
         // graph of many small passes — a simulation's dispatches — spends more on that than on its work.
         // The command buffer works out the barriers between them, as it does between any two commands.
         Task<void> RunTogetherOnBackground(std::vector<RenderPass*> passes, std::vector<const std::vector<ImageBarrier>*> handoffs,
-                                           std::unique_ptr<CommandBuffer>& out, std::vector<double*> ms,
+                                           std::unique_ptr<CommandBuffer>& out, std::vector<CpuSpan*> spans,
                                            std::vector<Token> after, std::shared_ptr<detail::SceneLife> scene, Window* target) {
             co_await Context::SwitchToBackgroundThread();
             if (!after.empty()) co_await WhenAll(std::move(after));
@@ -867,11 +911,13 @@ namespace kor {
             cb->Begin();
             for (std::size_t k = 0; k < passes.size(); ++k) {
                 const auto start = Clock::now();
+                spans[k]->at = millisecondsAt(start);
+                spans[k]->thread = std::this_thread::get_id();
                 cb->BeginTimer(passes[k]->Name());
                 static_cast<const RenderPass&>(*passes[k]).Record(*cb);
                 if (!handoffs[k]->empty()) cb->Barrier({}, *handoffs[k]);
                 cb->EndTimer();
-                *ms[k] = millisecondsSince(start);
+                spans[k]->ms = millisecondsSince(start);
             }
             out = std::move(cb);
         }
@@ -880,7 +926,7 @@ namespace kor {
         // before it waits: a token resumes whoever awaits it on the executor they awaited from, and the
         // main thread is blocked until every pass has run.
         Task<void> RunOnBackground(RenderPass& pass, const bool onCpu, const bool async, const std::vector<ImageBarrier>& handoffs,
-                                   std::unique_ptr<CommandBuffer>& out, double& ms,
+                                   std::unique_ptr<CommandBuffer>& out, CpuSpan& span,
                                    std::vector<Token> after, std::shared_ptr<detail::SceneLife> scene, Window* target) {
             co_await Context::SwitchToBackgroundThread();
             if (!after.empty()) co_await WhenAll(std::move(after));
@@ -888,7 +934,7 @@ namespace kor {
             // scene runs: `Window::` in a pass, and a render pass opened without a framebuffer, are its.
             detail::SceneScope scope(scene);
             detail::WindowScope window(target);
-            RunTimed(pass, onCpu, async, handoffs, out, ms);
+            RunTimed(pass, onCpu, async, handoffs, out, span);
         }
     }
 
@@ -919,10 +965,11 @@ namespace kor {
         if (_dirty) Build();
         if (_broken || _order.empty()) return false;
 
-        std::vector<double> prepareMs(_order.size(), 0.0);
+        std::vector<double> prepareMs(_order.size(), 0.0), prepareAt(_order.size(), 0.0);
         const auto prepareStart = Clock::now();
         for (std::size_t i = 0; i < _order.size(); ++i) {
             const auto start = Clock::now();
+            prepareAt[i] = millisecondsAt(start);
             _order[i]->Prepare();
             prepareMs[i] = millisecondsSince(start);
         }
@@ -974,7 +1021,7 @@ namespace kor {
         }
 
         std::vector<std::unique_ptr<CommandBuffer>> recorded(runs.size());
-        std::vector<double> recordMs(_order.size(), 0.0);
+        std::vector<CpuSpan> recordSpans(_order.size());
         const auto recordStart = Clock::now();
         _recording = true;
         for (const auto& set : _importedSets | std::views::values) if (set) ++set->_recording;
@@ -989,19 +1036,19 @@ namespace kor {
                         if (_order[dependency]->RunsOnCpu() && runOf[dependency] != r) after.push_back(tasks[runOf[dependency]].Completion());
                 if (run.count == 1) {
                     const std::size_t i = run.first;
-                    tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), _async[i], _handoffs[i], recorded[r], recordMs[i], std::move(after),
+                    tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), _async[i], _handoffs[i], recorded[r], recordSpans[i], std::move(after),
                                                     scene->Life().lock(), _target));
                     continue;
                 }
                 std::vector<RenderPass*> passes;
                 std::vector<const std::vector<ImageBarrier>*> handoffs;
-                std::vector<double*> ms;
+                std::vector<CpuSpan*> spans;
                 for (std::size_t i = run.first; i < run.first + run.count; ++i) {
                     passes.push_back(_order[i]);
                     handoffs.push_back(&_handoffs[i]);
-                    ms.push_back(&recordMs[i]);
+                    spans.push_back(&recordSpans[i]);
                 }
-                tasks.push_back(RunTogetherOnBackground(std::move(passes), std::move(handoffs), recorded[r], std::move(ms), std::move(after),
+                tasks.push_back(RunTogetherOnBackground(std::move(passes), std::move(handoffs), recorded[r], std::move(spans), std::move(after),
                                                         scene->Life().lock(), _target));
             }
             auto all = WhenAll(std::move(tasks));
@@ -1019,8 +1066,26 @@ namespace kor {
             auto& timing = stats.passes[_order[i]->Name()];
             timing.name = _order[i]->Name();
             Stats::average(timing.prepareMs, prepareMs[i]);
-            Stats::average(timing.recordMs, recordMs[i]);
-            recordWork += recordMs[i];
+            Stats::average(timing.recordMs, recordSpans[i].ms);
+            recordWork += recordSpans[i].ms;
+        }
+        // This frame as it went on the CPU, kept for its GPU side to join when it comes.
+        {
+            Stats::FrameTrace trace { .frame = stats.frames + 1, .startMs = millisecondsAt(prepareStart) };
+            std::lock_guard lock(stats.traceMutex);
+            stats.threads.try_emplace(_owner, 0);
+            for (std::size_t i = 0; i < _order.size(); ++i) {
+                auto& pass = trace.passes[_order[i]->Name()];
+                pass.prepareAt = prepareAt[i];
+                pass.prepareMs = prepareMs[i];
+                pass.recordAt = recordSpans[i].at;
+                pass.recordMs = recordSpans[i].ms;
+                pass.onCpu = _order[i]->RunsOnCpu();
+                if (recordSpans[i].at >= 0.0)
+                    pass.thread = stats.threads.try_emplace(recordSpans[i].thread, static_cast<int>(stats.threads.size())).first->second;
+            }
+            stats.traces.push_back(std::move(trace));
+            if (stats.traces.size() > Stats::Traced) stats.traces.pop_front();
         }
         for (std::size_t r = 0; r < runs.size(); ++r) {
             if (!recorded[r]) continue;
@@ -1034,7 +1099,14 @@ namespace kor {
                     auto& timing = statsNow->passes[result.label];
                     Stats::average(timing.gpuMs, result.milliseconds);
                     timing.gpuMeasured = true;
-                    statsNow->began[result.label] = { result.beginMs, result.milliseconds, frame };
+                    std::lock_guard lock(statsNow->traceMutex);
+                    const auto trace = std::ranges::find(statsNow->traces, frame, &Stats::FrameTrace::frame);
+                    if (trace == statsNow->traces.end()) continue;     // gone by: older than the frames kept
+                    auto& pass = trace->passes[result.label];
+                    pass.gpuAt = result.beginMs;
+                    pass.gpuMs = result.milliseconds;
+                    pass.gpuCpuClock = result.cpuClock;
+                    pass.work = result.work;
                 }
             });
         }
