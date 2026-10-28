@@ -103,19 +103,30 @@ namespace kmdl
          * @brief A material as the file declares it: factors, and paths to its textures.
          *
          * Texture paths are resolved but not loaded — pass them to kimg::LoadImage for the ones
-         * the renderer actually uses. Which fields are filled depends on the format: glTF populates the
-         * physically-based set (base colour, roughness, metallic), older formats the classic one
-         * (diffuse, specular, shininess).
+         * the renderer actually uses. Which fields are filled depends on the format, and `model` says
+         * which: glTF (and any file that gives a metallic or roughness) populates the physically-based
+         * set (base colour, roughness, metallic), older formats — OBJ, FBX's Phong and Lambert — the
+         * classic one (diffuse, specular, shininess). The other set keeps its defaults.
          */
         struct KMDL_API Material {
-            std::string name;
+            /** @brief How the file describes the surface: which of the sets below it filled. */
+            enum class Model : std::uint8_t { ePbr, eClassic };
 
+            std::string name;
+            Model model = Model::ePbr;
+
+            /// 1 opaque, 0 blended by its opacity, between them cut out below it.
             float alphaCutoff = 1.f;
             kor::Vec4 baseColorFactor = kor::Vec4(1.0f);
             kor::Vec4 emissiveFactor = kor::Vec4(1.0f);
             float roughness = 1.0f;
             float metallic = 1.0f;
             int doubleSided = false;
+
+            // The classic set: what a file of Model::eClassic gives.
+            kor::Vec4 diffuseColor = kor::Vec4(1.0f);   ///< a: how opaque (OBJ's `d`).
+            kor::Vec3 specularColor = kor::Vec3(0.0f);  ///< With the file's specular strength multiplied in.
+            float shininess = 0.0f;                     ///< The Phong exponent, as the file has it.
 
             std::optional<std::filesystem::path> albedoTexturePath;
             std::optional<std::filesystem::path> normalTexturePath;

@@ -136,4 +136,52 @@ TEST_F(GpuTest, ImporterKeepsAGltfLightsColourAndIntensityApart) {
     std::filesystem::remove(path);
 }
 
+// A glTF describes its materials physically, and says so.
+TEST_F(GpuTest, ImporterReportsAGltfMaterialAsPhysicallyBased) {
+    auto importer = Importer::Load(helmetPath());
+    ASSERT_NE(importer, nullptr);
+    const auto scene = importer->LoadScene();
+    ASSERT_FALSE(scene.materials.empty());
+    for (const auto& material : scene.materials) EXPECT_EQ(material.model, Importer::Material::Model::ePbr) << material.name;
+}
+
+// An OBJ's materials are classic: a diffuse and a specular colour and a shininess, which the importer hands back
+// as the file has them, with its opacity — see-through by `d`, cut out by `map_d`.
+TEST_F(GpuTest, ImporterReportsAnObjMaterialTheClassicWay) {
+    const auto directory = std::filesystem::temp_directory_path() / "koral_classic_test";
+    std::filesystem::create_directories(directory);
+    {
+        std::ofstream mtl(directory / "classic.mtl");
+        mtl << "newmtl glass\nKd 0.5 0.25 0.125\nKs 0.2 0.4 0.6\nNs 64\nd 0.5\nillum 2\n"
+               "newmtl leaves\nKd 0.1 0.8 0.1\nmap_d leaves_mask.png\nillum 2\n";
+        std::ofstream obj(directory / "classic.obj");
+        obj << "mtllib classic.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nv 1 1 0\n"
+               "usemtl glass\nf 1 2 3\nusemtl leaves\nf 2 4 3\n";
+    }
+    auto importer = Importer::Load(directory / "classic.obj");
+    ASSERT_NE(importer, nullptr);
+    const auto scene = importer->LoadScene();
+
+    const auto find = [&](const std::string& name) {
+        for (const auto& material : scene.materials) if (material.name == name) return material;
+        ADD_FAILURE() << "no material named " << name;
+        return Importer::Material{};
+    };
+    const auto glass = find("glass");
+    EXPECT_EQ(glass.model, Importer::Material::Model::eClassic);
+    EXPECT_EQ(glass.diffuseColor, kor::Vec4(0.5f, 0.25f, 0.125f, 0.5f));
+    EXPECT_EQ(glass.specularColor, kor::Vec3(0.2f, 0.4f, 0.6f));
+    EXPECT_EQ(glass.shininess, 64.f);
+    EXPECT_EQ(glass.alphaCutoff, 0.f) << "see-through by its opacity: blended";
+
+    const auto leaves = find("leaves");
+    EXPECT_EQ(leaves.model, Importer::Material::Model::eClassic);
+    EXPECT_GT(leaves.alphaCutoff, 0.f) << "cut out by its opacity texture";
+    EXPECT_LT(leaves.alphaCutoff, 1.f);
+    ASSERT_TRUE(leaves.alphaTexturePath.has_value());
+    EXPECT_EQ(leaves.alphaTexturePath->filename(), "leaves_mask.png");
+
+    std::filesystem::remove_all(directory);
+}
+
 } // namespace

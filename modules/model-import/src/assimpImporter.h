@@ -275,13 +275,44 @@ namespace kmdl {
         }
 
         float roughness;
-        if (material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS) {
+        const bool hasRoughness = material->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness) == AI_SUCCESS;
+        if (hasRoughness) {
             result.roughness = roughness;
         }
 
         float metallic;
-        if (material->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS) {
+        const bool hasMetallic = material->Get(AI_MATKEY_METALLIC_FACTOR, metallic) == AI_SUCCESS;
+        if (hasMetallic) {
             result.metallic = metallic;
+        }
+
+        // A file is physically based when it says so (glTF's shading model) or gives what only such a
+        // material has: a metallic or a roughness, as a factor or a texture. Anything else — OBJ, FBX's
+        // Phong and Lambert — is described the classic way.
+        int shadingModel = 0;
+        const bool saysPbr = material->Get(AI_MATKEY_SHADING_MODEL, shadingModel) == AI_SUCCESS
+                          && shadingModel == aiShadingMode_PBR_BRDF;
+        const bool hasPbrTexture = material->GetTextureCount(aiTextureType_METALNESS) > 0
+                                || material->GetTextureCount(aiTextureType_DIFFUSE_ROUGHNESS) > 0;
+        result.model = saysPbr || hasRoughness || hasMetallic || hasPbrTexture ? Material::Model::ePbr : Material::Model::eClassic;
+
+        aiColor3D diffuseColor;
+        if (material->Get(AI_MATKEY_COLOR_DIFFUSE, diffuseColor) == AI_SUCCESS) {
+            result.diffuseColor = kor::Vec4(diffuseColor.r, diffuseColor.g, diffuseColor.b, 1.f);
+        }
+        float opacity;
+        if (material->Get(AI_MATKEY_OPACITY, opacity) == AI_SUCCESS) {
+            result.diffuseColor.w = kor::Clamp(opacity, 0.f, 1.f);
+        }
+        aiColor3D specularColor;
+        if (material->Get(AI_MATKEY_COLOR_SPECULAR, specularColor) == AI_SUCCESS) {
+            float strength = 1.f;
+            material->Get(AI_MATKEY_SHININESS_STRENGTH, strength);
+            result.specularColor = kor::Vec3(specularColor.r, specularColor.g, specularColor.b) * strength;
+        }
+        float shininess;
+        if (material->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS) {
+            result.shininess = shininess;
         }
 
         int doubleSided;
@@ -305,6 +336,14 @@ namespace kmdl {
                 result.alphaCutoff = kor::Clamp(cutoff, 0.0001f, 1.0f);
             } else { // "OPAQUE"
                 result.alphaCutoff = 1.0f;
+            }
+        } else if (result.model == Material::Model::eClassic) {
+            // A classic file has no alpha mode: it is see-through by its opacity (OBJ's `d`), and
+            // cut out by an opacity texture (`map_d`, leaves and fences).
+            if (material->GetTextureCount(aiTextureType_OPACITY) > 0) {
+                result.alphaCutoff = 0.5f;
+            } else if (result.diffuseColor.w < 1.f) {
+                result.alphaCutoff = 0.0f;
             }
         }
 
@@ -345,7 +384,12 @@ namespace kmdl {
             }
             if (material->GetTextureCount(aiTextureType_SHININESS) > 0) {
                 if (material->GetTexture(aiTextureType_SHININESS, 0, &texName) == AI_SUCCESS) {
-                    result.roughnessTexturePath = resolveTexture(texName);
+                    result.shininessTexturePath = resolveTexture(texName);
+                }
+            }
+            if (material->GetTextureCount(aiTextureType_OPACITY) > 0) {
+                if (material->GetTexture(aiTextureType_OPACITY, 0, &texName) == AI_SUCCESS) {
+                    result.alphaTexturePath = resolveTexture(texName);
                 }
             }
         }
