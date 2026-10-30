@@ -11,6 +11,7 @@
 #include <fstream>
 #include <atomic>
 #include <cstring>
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -419,6 +420,12 @@ namespace kor
                                   const std::string& entry,
                                   const std::vector<std::filesystem::path>& searchPaths)
     {
+        // One compile at a time: a reload runs on the file-watcher's thread, and every session is of the one global
+        // session, which is not safe from two threads — two at once corrupt its heap, and it crashes somewhere else later.
+        // Held to the end, so that the session goes under it too.
+        static std::mutex compiling;
+        const std::scoped_lock held(compiling);
+
         // Per-compile session carrying the current search paths and a SPIR-V target.
         std::vector<std::string> pathStrings;
         pathStrings.reserve(searchPaths.size());
