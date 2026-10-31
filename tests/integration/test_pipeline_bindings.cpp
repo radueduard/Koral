@@ -151,6 +151,29 @@ TEST_F(GpuTest, AStructuredBuffersElementAndItsAnnotationsAreReflected) {
     EXPECT_TRUE(output->elementMembers.empty()) << "an array of floats has no struct to describe";
 }
 
+// Two buffers' structs with members of one name: each is annotated as its own struct says. Taken by name alone, the
+// second would be given the first's — and a material's fields read from a kind none of its entities have.
+TEST_F(GpuTest, AStructuredBuffersElementsAreAnnotatedAsTheirOwnStruct) {
+    AddTestShaders();
+    const auto shader = Shader::Builder{}.SetEntryPoint("sameMemberNames", "computeMain").GetOrBuild();
+    ASSERT_TRUE(shader.Valid()) << shader.Failure()->History();
+
+    const auto* firsts = Find(*shader, "firsts");
+    ASSERT_NE(firsts, nullptr);
+    ASSERT_EQ(firsts->elementMembers.size(), 2u);
+    EXPECT_EQ(firsts->elementMembers[0].semanticNamespace, "thing");
+    EXPECT_EQ(firsts->elementMembers[0].semantic, "FIRST");
+    EXPECT_EQ(firsts->elementMembers[1].semantic, "ONLY_FIRST");
+
+    const auto* seconds = Find(*shader, "seconds");
+    ASSERT_NE(seconds, nullptr);
+    ASSERT_EQ(seconds->elementMembers.size(), 2u);
+    EXPECT_EQ(seconds->elementMembers[0].semanticNamespace, "other");
+    EXPECT_EQ(seconds->elementMembers[0].semantic, "SECOND");
+    EXPECT_TRUE(seconds->elementMembers[1].semanticNamespace.empty()) << "not annotated: not the other's";
+    EXPECT_TRUE(seconds->elementMembers[1].semantic.empty());
+}
+
 // A mesh shader compiles to the EXT execution model, which is not the NV one under another name:
 // taken for an unknown stage, no mesh shader written in Slang could be loaded at all.
 TEST_F(GpuTest, AMeshShaderIsKnownForOne) {

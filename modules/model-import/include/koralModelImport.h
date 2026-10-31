@@ -202,6 +202,26 @@ namespace kmdl
             float     range          = 0.0f;                    ///< Distance at which it stops contributing; 0 means no limit.
             float     innerConeAngle = 0.0f;                    ///< Spot: the fully lit cone, in radians.
             float     outerConeAngle = 0.0f;                    ///< Spot: where the falloff reaches zero, in radians.
+            kor::i32  node = -1;                                ///< Index into Scene::nodes of the node it is on; -1 for none.
+            /// Whether it is at its node's origin facing the node's -Z, as a glTF's always is: all of where it is and
+            /// which way it faces is its node's, and position and direction are only what that works out to.
+            bool      atNode = false;
+        };
+
+        /** @brief A camera the file declares, looking along its -Z with +Y up. */
+        struct KMDL_API Camera {
+            std::string name;                                   ///< Name in the file: its node's, where it is on one.
+            kor::Vec3 position  = kor::Vec3(0.0f);              ///< World-space position.
+            kor::Vec3 direction = kor::Vec3(0.0f, 0.0f, -1.0f); ///< World-space direction it looks in.
+            kor::Vec3 up        = kor::Vec3(0.0f, 1.0f, 0.0f);  ///< World-space up.
+            bool      orthographic = false;
+            float     verticalFieldOfView = 1.0f;               ///< Perspective: top to bottom, in radians.
+            float     orthographicHeight  = 2.0f;               ///< Orthographic: how much it sees, top to bottom.
+            float     aspect = 0.0f;                            ///< Width over height; 0: the file says none — the screen's.
+            float     zNear  = 0.1f;                            ///< Nearest it sees.
+            float     zFar   = 0.0f;                            ///< Furthest it sees; 0: no limit (an infinite perspective).
+            kor::i32  node = -1;                                ///< Index into Scene::nodes of the node it is on; -1 for none.
+            bool      atNode = false;                           ///< As Light::atNode: where it is and which way it looks are all its node's.
         };
 
         /** @brief Everything a model file contains. */
@@ -210,6 +230,7 @@ namespace kmdl
             std::vector<Material> materials;    ///< Materials, referenced by Node::materialIndices.
             std::vector<Node> nodes;            ///< The scene graph. Node 0 is the root.
             std::vector<Light> lights;          ///< Lights the file declares.
+            std::vector<Camera> cameras;        ///< Cameras the file declares.
         };
 
         virtual ~Importer() = default;
@@ -236,7 +257,7 @@ namespace kmdl
         /** @brief One material by name. */
         virtual Material GetMaterial(const std::string& name) = 0;
 
-        /** @brief Everything in the file at once: meshes, materials, the node hierarchy and lights. */
+        /** @brief Everything in the file at once: meshes, materials, the node hierarchy, lights and cameras. */
         virtual Scene LoadScene() = 0;
 
         /**

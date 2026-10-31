@@ -398,7 +398,7 @@ namespace kor
             // How a binding is accessed is up to the shader that consumes it, so it is read from the
             // bound pipeline's layout, not from the one the set was allocated with: a set built for a
             // compute pass that writes it may be bound, unchanged, to a draw that only reads it.
-            auto layout = pipeline ? pipeline->SetLayoutRef(index) : kor::ResourceRef<const DescriptorSetLayout>{};
+            auto layout = pipeline && std::ranges::contains(pipeline->SetIndices(), index) ? pipeline->SetLayoutRef(index) : kor::ResourceRef<const DescriptorSetLayout>{};
             if (!layout.Alive() || layout.Poisoned()) layout = set->Layout();
             if (!layout.Alive() || layout.Poisoned()) continue;
 
@@ -1125,7 +1125,9 @@ namespace kor
         // barriers their images needed were never emitted.
         void keepCompatibleSets(std::map<kor::u32, kor::ResourceRef<const DescriptorSet>>& sets, const Pipeline& pipeline) {
             for (auto it = sets.begin(); it != sets.end(); ++it) {
-                const auto wanted = pipeline.SetLayoutRef(it->first);
+                // A set this pipeline has none of at that index is as incompatible as one of another layout.
+                const bool declared = std::ranges::contains(pipeline.SetIndices(), it->first);
+                const auto wanted = declared ? pipeline.SetLayoutRef(it->first) : kor::ResourceRef<const DescriptorSetLayout> {};
                 const auto& set = it->second;
                 const bool stands = wanted.Alive() && set.Alive() && !set.Poisoned() && set->Layout().Alive()
                                  && compatibleLayouts(*set->Layout(), *wanted);

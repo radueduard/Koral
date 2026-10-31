@@ -4,7 +4,9 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cctype>
+#include <cmath>
 
 #include <queue>
 #include <unordered_map>
@@ -48,7 +50,10 @@ namespace kmdl {
          * between a model that renders and one that comes up untextured.
          */
         [[nodiscard]] std::filesystem::path resolveTexture(const aiString &name) const {
-            std::filesystem::path relative(name.C_Str());
+            // Written on Windows, as an FBX mostly is: here a backslash would be part of one long file name.
+            std::string written(name.C_Str());
+            std::ranges::replace(written, '\\', '/');
+            std::filesystem::path relative(written);
             if (relative.is_absolute()) return relative;
 
             std::error_code ec;
@@ -442,6 +447,22 @@ namespace kmdl {
                 }
             }
         }
+
+        // An FBX has no metalness to give: the 1 here is only the default, and its roughness is what assimp worked out of
+        // its Phong shininess. Taken as they are, every FBX would be a dark mirror. With no picture of them, it is not
+        // metal. A file made for metal-rough shading packs occlusion, roughness and metalness into its specular picture, as
+        // glTF packs them (Bistro does): the picture holds them, so its factors are 1.
+        std::string ending = _path.extension().string();
+        std::ranges::transform(ending, ending.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (ending == ".fbx" && !hasMetallic && !result.roughnessTexturePath && !result.metallicTexturePath) {
+            if (result.specularTexturePath) {
+                result.roughnessTexturePath = result.specularTexturePath;
+                if (!result.ambientOcclusionTexturePath) result.ambientOcclusionTexturePath = result.specularTexturePath;
+                result.roughness = 1.f;
+            } else {
+                result.metallic = 0.f;
+            }
+        }
         result.name = materialName;
 
         return result;
@@ -502,6 +523,7 @@ namespace kmdl {
             result.materials.emplace_back(GetMaterialAt(i));
         }
 
+        std::unordered_map<const aiNode*, kor::u32> indexOf;   // where each node went in result.nodes
         std::queue<std::pair<aiNode*, kor::u32>> nodeQueue;
         nodeQueue.emplace(_scene->mRootNode, -1);
         while (!nodeQueue.empty()) {
@@ -510,6 +532,7 @@ namespace kmdl {
 
             const std::string nodeName = currentNode->mName.C_Str();
             const auto nodeIndex = static_cast<kor::u32>(result.nodes.size());
+            indexOf.emplace(currentNode, nodeIndex);
             result.nodes.emplace_back(GetNode(currentNode));
             if (parentIndex != -1) {
                 result.nodes[parentIndex].childIndices.emplace_back(nodeIndex);
@@ -529,29 +552,42 @@ namespace kmdl {
         const std::vector<detail::GltfLight> declared = detail::ReadGltfLights(_path);
         const bool fromFile = declared.size() == _scene->mNumLights;
 
+        // A light or a camera is on the node of its name: that node's world transform, and its index among result.nodes.
+        const auto placed = [&](const aiString& name) {
+            std::pair<aiMatrix4x4, kor::i32> at { aiMatrix4x4 {}, -1 };     // identity, on none
+            if (const aiNode* node = _scene->mRootNode->FindNode(name)) {
+                at.first = node->mTransformation;
+                for (const aiNode* p = node->mParent; p != nullptr; p = p->mParent)
+                    at.first = p->mTransformation * at.first;
+                if (const auto it = indexOf.find(node); it != indexOf.end()) at.second = static_cast<kor::i32>(it->second);
+            }
+            return at;
+        };
+        const auto turned = [](const aiMatrix4x4& world, const aiVector3D& d) {
+            aiVector3D out(world.a1 * d.x + world.a2 * d.y + world.a3 * d.z,
+                           world.b1 * d.x + world.b2 * d.y + world.b3 * d.z,
+                           world.c1 * d.x + world.c2 * d.y + world.c3 * d.z);
+            if (out.SquareLength() > 0.0f) out.Normalize();
+            return kor::Vec3(out.x, out.y, out.z);
+        };
+        const auto at = [](const aiVector3D& a, const float x, const float y, const float z) {
+            return std::abs(a.x - x) < 1e-4f && std::abs(a.y - y) < 1e-4f && std::abs(a.z - z) < 1e-4f;
+        };
+
         result.lights.reserve(_scene->mNumLights);
         for (unsigned int i = 0; i < _scene->mNumLights; ++i) {
             const aiLight* light = _scene->mLights[i];
-
-            aiMatrix4x4 world;  // identity
-            if (const aiNode* node = _scene->mRootNode->FindNode(light->mName)) {
-                world = node->mTransformation;
-                for (const aiNode* p = node->mParent; p != nullptr; p = p->mParent)
-                    world = p->mTransformation * world;
-            }
-
+            const auto [world, node] = placed(light->mName);
             const aiVector3D pos = world * light->mPosition;
-            const aiVector3D d   = light->mDirection;
-            aiVector3D dir(
-                world.a1 * d.x + world.a2 * d.y + world.a3 * d.z,
-                world.b1 * d.x + world.b2 * d.y + world.b3 * d.z,
-                world.c1 * d.x + world.c2 * d.y + world.c3 * d.z);
-            if (dir.SquareLength() > 0.0f) dir.Normalize();
 
             Importer::Light out;
             out.name      = light->mName.C_Str();
             out.position  = kor::Vec3(pos.x, pos.y, pos.z);
-            out.direction = kor::Vec3(dir.x, dir.y, dir.z);
+            out.direction = turned(world, light->mDirection);
+            out.node      = node;
+            // A point light has no direction to be the node's: only where it is.
+            out.atNode    = node >= 0 && at(light->mPosition, 0.f, 0.f, 0.f)
+                         && (light->mType == aiLightSource_POINT || at(light->mDirection, 0.f, 0.f, -1.f));
             if (fromFile) {
                 out.color     = declared[i].color;
                 out.intensity = declared[i].intensity;
@@ -573,6 +609,43 @@ namespace kmdl {
             }
 
             result.lights.push_back(out);
+        }
+
+        // Cameras. A glTF's own list gives its field of view as it wrote it: top to bottom, whatever the aspect.
+        const std::vector<detail::GltfCamera> written = detail::ReadGltfCameras(_path);
+        const bool camerasFromFile = written.size() == _scene->mNumCameras;
+        result.cameras.reserve(_scene->mNumCameras);
+        for (unsigned int i = 0; i < _scene->mNumCameras; ++i) {
+            const aiCamera* camera = _scene->mCameras[i];
+            const auto [world, node] = placed(camera->mName);
+            const aiVector3D pos = world * camera->mPosition;
+
+            Importer::Camera out;
+            out.name      = camera->mName.C_Str();
+            out.position  = kor::Vec3(pos.x, pos.y, pos.z);
+            out.direction = turned(world, camera->mLookAt);
+            out.up        = turned(world, camera->mUp);
+            out.node      = node;
+            out.atNode    = node >= 0 && at(camera->mPosition, 0.f, 0.f, 0.f) && at(camera->mLookAt, 0.f, 0.f, -1.f) && at(camera->mUp, 0.f, 1.f, 0.f);
+            if (camerasFromFile) {
+                const detail::GltfCamera& from = written[i];
+                out.orthographic = from.orthographic;
+                if (from.orthographic) out.orthographicHeight = 2.f * from.ymag;
+                else out.verticalFieldOfView = from.yfov;
+                out.aspect = from.aspect;
+                out.zNear  = from.znear;
+                out.zFar   = from.zfar;
+            } else {
+                // Assimp's: half the horizontal field of view, and half the width an orthographic one sees.
+                out.aspect       = camera->mAspect;
+                out.orthographic = camera->mOrthographicWidth > 0.f;
+                const float tall = out.aspect > 0.f ? 1.f / out.aspect : 1.f;
+                if (out.orthographic) out.orthographicHeight = 2.f * camera->mOrthographicWidth * tall;
+                else out.verticalFieldOfView = 2.f * std::atan(std::tan(camera->mHorizontalFOV) * tall);
+                out.zNear = camera->mClipPlaneNear;
+                out.zFar  = camera->mClipPlaneFar;
+            }
+            result.cameras.push_back(out);
         }
 
         return result;

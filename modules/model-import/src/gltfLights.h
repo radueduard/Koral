@@ -22,4 +22,23 @@ namespace kmdl::detail
      * line up with aiScene::mLights by index. Empty for any other format, or a file with no lights.
      */
     std::vector<GltfLight> ReadGltfLights(const std::filesystem::path& path);
+
+    /** @brief One camera of a glTF file's `cameras`, as the file wrote it. */
+    struct GltfCamera {
+        bool orthographic = false;
+        float yfov = 0.f;           ///< Perspective: top to bottom, in radians.
+        float ymag = 0.f;           ///< Orthographic: half of what it sees, top to bottom.
+        float aspect = 0.f;         ///< 0: the file set none.
+        float znear = 0.f;
+        float zfar = 0.f;           ///< 0: none — an infinite perspective.
+    };
+
+    /**
+     * @brief The cameras a .gltf or .glb declares, in the order it declares them.
+     *
+     * Assimp turns a glTF camera's vertical field of view into a horizontal one by an aspect ratio the file need not
+     * give. It keeps the file's order, so these line up with aiScene::mCameras by index. Empty for any other format,
+     * or a file with no cameras.
+     */
+    std::vector<GltfCamera> ReadGltfCameras(const std::filesystem::path& path);
 }

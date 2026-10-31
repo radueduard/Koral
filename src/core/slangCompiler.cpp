@@ -96,7 +96,7 @@ namespace kor
     namespace
     {
         constexpr std::uint32_t CacheMagic = 0x4b534c43;    // "KSLC"
-        constexpr std::uint32_t CacheVersion = 2;     // 2: push constants' defaults and attributes
+        constexpr std::uint32_t CacheVersion = 3;     // 2: push constants' defaults and attributes. 3: annotations by parameter
 
         std::filesystem::path cacheDirectory()
         {
@@ -499,9 +499,14 @@ namespace kor
         // drops them: reflection reports nothing for them, and nothing reaches the SPIR-V either.
         // User attributes are the one annotation it keeps, argument string and all. @see semantics.h
         if (slang::ProgramLayout* layout = linked->getLayout(0, diagnostics.writeRef())) {
-            const auto annotations = [&](slang::VariableLayoutReflection* field) {
+            // Under its bare name, and under `parameter.name` when it is a member of one: two buffers' structs may have
+            // members of one name that mean different things. One with nothing on it says so there, or it would be taken
+            // for the other's.
+            const auto annotations = [&](slang::VariableLayoutReflection* field, const std::string& parameter) {
                 slang::VariableReflection* variable = field->getVariable();
                 if (!variable) return;
+                const std::string scoped = parameter.empty() ? std::string() : parameter + "." + field->getName();
+                bool annotated = false;
                 for (unsigned a = 0; a < variable->getUserAttributeCount(); ++a) {
                     slang::UserAttribute* attribute = variable->getUserAttributeByIndex(a);
                     const char* name = attribute ? attribute->getName() : nullptr;
@@ -515,12 +520,15 @@ namespace kor
                     if (const char* value = attribute->getArgumentValueString(0, &length)) {
                         std::string semantic(value, length);
                         std::erase(semantic, '"');   // the argument arrives quoted
+                        if (!scoped.empty()) result.fieldSemantics.emplace(scoped, SlangCompileResult::FieldSemantic{ name, semantic });
                         result.fieldSemantics.emplace(
                             field->getName(), SlangCompileResult::FieldSemantic{ name, std::move(semantic) });
+                        annotated = true;
                     }
                 }
+                if (!annotated && !scoped.empty()) result.fieldSemantics.emplace(scoped, SlangCompileResult::FieldSemantic{});
             };
-            const auto collect = [&](auto&& self, slang::TypeLayoutReflection* typeLayout) -> void {
+            const auto collect = [&](auto&& self, slang::TypeLayoutReflection* typeLayout, const std::string& parameter) -> void {
                 if (!typeLayout) return;
 
                 // Unwrap the container a block arrives in — ConstantBuffer<T>, ParameterBlock<T>, and the
@@ -536,16 +544,16 @@ namespace kor
                 for (unsigned f = 0; f < typeLayout->getFieldCount(); ++f) {
                     slang::VariableLayoutReflection* field = typeLayout->getFieldByIndex(f);
                     if (!field || !field->getName()) continue;
-                    annotations(field);
-                    self(self, field->getTypeLayout());   // nested structs annotate too
+                    annotations(field, parameter);
+                    self(self, field->getTypeLayout(), parameter);   // nested structs annotate too
                 }
             };
 
             for (unsigned i = 0; i < layout->getParameterCount(); ++i) {
                 if (slang::VariableLayoutReflection* parameter = layout->getParameterByIndex(i)) {
                     // A parameter itself is annotated by name as a field is: [entity("PER_INSTANCE")] on a buffer.
-                    if (parameter->getName()) annotations(parameter);
-                    collect(collect, parameter->getTypeLayout());
+                    if (parameter->getName()) annotations(parameter, {});
+                    collect(collect, parameter->getTypeLayout(), parameter->getName() ? parameter->getName() : "");
                 }
             }
         }

@@ -766,6 +766,13 @@ namespace kor {
     	if (module.get_type(element).basetype != spirv_cross::SPIRType::Struct) return;
     	stride = module.type_struct_member_array_stride(blockType, 0);
     	FetchStructMembers(module, module.get_type(element).self, members);
+    	// As this buffer's struct has them, where the front end told them apart from another's of the same names.
+    	const std::string name = module.get_name(resource.id);
+    	for (auto& member : members)
+    		if (const auto it = _fieldSemantics.find(name + "." + member.name); it != _fieldSemantics.end()) {
+    			member.semanticNamespace = it->second.moduleName;
+    			member.semantic = it->second.semantic;
+    		}
     }
 
 

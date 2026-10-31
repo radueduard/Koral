@@ -29,8 +29,28 @@ namespace kmdl::detail
         struct Extensions {
             rfl::Rename<"KHR_lights_punctual", std::optional<PunctualLights>> punctual;
         };
+        // Every field optional: a camera written otherwise than this expects costs the cameras, not the lights.
+        struct Perspective {
+            std::optional<float> aspectRatio;
+            std::optional<float> yfov;
+            std::optional<float> zfar;
+            std::optional<float> znear;
+        };
+        struct Orthographic {
+            std::optional<float> ymag;
+            std::optional<float> zfar;
+            std::optional<float> znear;
+        };
+        struct Camera {
+            std::optional<std::string> type;
+            std::optional<Perspective> perspective;
+            std::optional<Orthographic> orthographic;
+        };
         struct Document {
             std::optional<Extensions> extensions;
+        };
+        struct CameraDocument {
+            std::optional<std::vector<Camera>> cameras;
         };
     }
 
@@ -81,5 +101,34 @@ namespace kmdl::detail
             lights.push_back(out);
         }
         return lights;
+    }
+
+    std::vector<GltfCamera> ReadGltfCameras(const std::filesystem::path& path)
+    {
+        const auto extension = path.extension();
+        if (extension != ".gltf" && extension != ".glb") return {};
+
+        const auto json = documentOf(path);
+        if (!json) return {};
+        const auto document = rfl::json::read<CameraDocument>(*json);
+        if (!document || !document->cameras) return {};
+
+        std::vector<GltfCamera> cameras;
+        for (const auto& camera : *document->cameras) {
+            GltfCamera out;
+            out.orthographic = camera.type.value_or("perspective") == "orthographic";
+            if (out.orthographic && camera.orthographic) {
+                out.ymag = camera.orthographic->ymag.value_or(1.f);
+                out.znear = camera.orthographic->znear.value_or(0.f);
+                out.zfar = camera.orthographic->zfar.value_or(0.f);
+            } else if (camera.perspective) {
+                out.yfov = camera.perspective->yfov.value_or(0.f);
+                out.aspect = camera.perspective->aspectRatio.value_or(0.f);
+                out.znear = camera.perspective->znear.value_or(0.f);
+                out.zfar = camera.perspective->zfar.value_or(0.f);     // the spec's: none, an infinite projection
+            }
+            cameras.push_back(out);
+        }
+        return cameras;
     }
 }

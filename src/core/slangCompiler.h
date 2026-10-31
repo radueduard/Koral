@@ -29,7 +29,8 @@ namespace kor
 
         /// Field name -> annotation, from the [module("SEMANTIC")] attributes on block members.
         /// Slang keeps user attributes in its reflection but drops `: SEMANTIC` on anything that
-        /// is not a varying, which is why the annotation is an attribute at all. @see semantics.h
+        /// is not a varying, which is why the annotation is an attribute at all. A parameter's member
+        /// is here as `parameter.member` too: empty when it has none. @see semantics.h
         std::map<std::string, FieldSemantic> fieldSemantics;
 
         /// Location -> the `: SEMANTIC` on a stage input. Varyings are the one place Slang keeps a

@@ -645,9 +645,9 @@ namespace kor
         /// One field's annotation: which module, and what for.
         struct FieldSemantic { std::string moduleName; std::string semantic; };
 
-        /// Field name -> annotation, from the shader's source or its Slang reflection. Field names
-        /// are unique enough within one shader that this needs no per-block scoping; two blocks
-        /// that happen to share a field name want the same semantic for it anyway.
+        /// Field name -> annotation, from the shader's source or its Slang reflection. A member of a
+        /// Slang buffer's struct is here as `parameter.member` too, which is what its element's fields
+        /// are read by: two buffers' structs may have members of one name that mean different things.
         std::map<std::string, FieldSemantic> _fieldSemantics;
 
         /// Location -> annotation, for stage inputs. Slang keeps `: POSITION` on varyings and

@@ -136,6 +136,66 @@ TEST_F(GpuTest, ImporterKeepsAGltfLightsColourAndIntensityApart) {
     std::filesystem::remove(path);
 }
 
+// A glTF's cameras come through as the file wrote them — the field of view top to bottom, its near and far — and, like
+// its lights, each on its node: all of where it is and which way it looks is the node's.
+TEST_F(GpuTest, ImporterHandsBackAGltfsCamerasOnTheirNodes) {
+    const auto path = std::filesystem::temp_directory_path() / "koral_cameras_test.gltf";
+    {
+        std::ofstream out(path);
+        out << R"GLTF({
+  "asset": {"version": "2.0"},
+  "extensionsUsed": ["KHR_lights_punctual"],
+  "extensions": {"KHR_lights_punctual": {"lights": [{"type": "spot", "intensity": 2.0, "spot": {"innerConeAngle": 0.2, "outerConeAngle": 0.4}}]}},
+  "scene": 0,
+  "scenes": [{"nodes": [0, 1, 2, 3]}],
+  "nodes": [
+    {"mesh": 0},
+    {"name": "eye", "translation": [1.0, 2.0, 3.0], "camera": 0},
+    {"name": "plan", "camera": 1},
+    {"name": "torch", "translation": [0.0, 4.0, 0.0], "extensions": {"KHR_lights_punctual": {"light": 0}}}
+  ],
+  "cameras": [
+    {"type": "perspective", "perspective": {"yfov": 0.8, "znear": 0.05, "zfar": 500.0}},
+    {"type": "orthographic", "orthographic": {"xmag": 4.0, "ymag": 3.0, "znear": 0.1, "zfar": 50.0}}
+  ],
+  "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+  "buffers": [{"byteLength": 36, "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA"}],
+  "bufferViews": [{"buffer": 0, "byteLength": 36}],
+  "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0]}]
+})GLTF";
+    }
+    auto importer = Importer::Load(path);
+    ASSERT_NE(importer, nullptr);
+    const auto scene = importer->LoadScene();
+    ASSERT_EQ(scene.cameras.size(), 2u);
+    const auto nodeNamed = [&](const kor::i32 index) { return index >= 0 ? scene.nodes[static_cast<std::size_t>(index)].name : std::string(); };
+
+    const Importer::Camera& eye = scene.cameras[0];
+    EXPECT_EQ(eye.name, "eye");
+    EXPECT_FALSE(eye.orthographic);
+    EXPECT_FLOAT_EQ(eye.verticalFieldOfView, 0.8f) << "as the file wrote it: top to bottom";
+    EXPECT_FLOAT_EQ(eye.zNear, 0.05f);
+    EXPECT_FLOAT_EQ(eye.zFar, 500.f);
+    EXPECT_EQ(eye.aspect, 0.f) << "the file gave none";
+    EXPECT_EQ(nodeNamed(eye.node), "eye");
+    EXPECT_TRUE(eye.atNode);
+    EXPECT_EQ(eye.position, kor::Vec3(1.f, 2.f, 3.f));
+
+    const Importer::Camera& plan = scene.cameras[1];
+    EXPECT_TRUE(plan.orthographic);
+    EXPECT_FLOAT_EQ(plan.orthographicHeight, 6.f);
+    EXPECT_FLOAT_EQ(plan.zFar, 50.f);
+    EXPECT_EQ(nodeNamed(plan.node), "plan");
+
+    ASSERT_EQ(scene.lights.size(), 1u);
+    EXPECT_EQ(scene.lights[0].type, Importer::Light::Type::eSpot);
+    EXPECT_EQ(nodeNamed(scene.lights[0].node), "torch");
+    EXPECT_TRUE(scene.lights[0].atNode);
+    EXPECT_FLOAT_EQ(scene.lights[0].outerConeAngle, 0.4f);
+
+    std::filesystem::remove(path);
+}
+
 // A glTF describes its materials physically, and says so.
 TEST_F(GpuTest, ImporterReportsAGltfMaterialAsPhysicallyBased) {
     auto importer = Importer::Load(helmetPath());
