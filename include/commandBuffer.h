@@ -937,9 +937,10 @@ namespace kor
          * @param groupCountX,groupCountY,groupCountZ Number of workgroups per axis, from there.
          *
          * The shader sees the workgroups as the whole grid numbers them: SV_GroupID (gl_WorkGroupID) and
-         * SV_DispatchThreadID (gl_GlobalInvocationID) start at the base. So a grid larger than one dispatch can count
-         * along an axis (maxComputeWorkGroupCount: 65,535 along y and z on most devices) runs as several, one after
-         * another, and the shader is none the wiser. Every compute pipeline is made so that it can be dispatched so.
+         * SV_DispatchThreadID (gl_GlobalInvocationID) start at the base. So a grid can be run a part at a time — a part
+         * each frame, or the parts on different queues — and the shader is none the wiser. The grid is no larger than one
+         * dispatch counts: each base is below maxComputeWorkGroupCount, and base plus count is at most that, each way
+         * (65,535 along y and z on most devices). Every compute pipeline is made so that it can be dispatched so.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
         CommandBuffer& DispatchBase(kor::u32 baseGroupX, kor::u32 baseGroupY, kor::u32 baseGroupZ,
