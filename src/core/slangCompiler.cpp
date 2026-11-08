@@ -266,7 +266,8 @@ namespace kor
                     if (comma == std::string_view::npos) break;
                     from = comma + 1;
                 }
-                if (numbers.size() == 1 && components > 1) numbers.assign(components, numbers.front());
+                // By value: assign may not be given a reference into the vector it fills.
+                if (numbers.size() == 1 && components > 1) numbers.assign(components, double(numbers.front()));
                 if (numbers.size() != components) return {};
                 return numbers;
             }
