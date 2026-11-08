@@ -1531,6 +1531,18 @@ namespace kor
         return DoDispatch(groupCountX, groupCountY, groupCountZ, where);
     }
 
+    CommandBuffer& CommandBuffer::DispatchBase(const kor::u32 baseGroupX, const kor::u32 baseGroupY, const kor::u32 baseGroupZ,
+                                               const kor::u32 groupCountX, const kor::u32 groupCountY, const kor::u32 groupCountZ,
+                                               const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (!_state.boundComputePipeline.has_value())
+            return RecordError(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
+        FlushDirectBinds(where);
+        if (_failed) return *this;
+        return DoDispatchBase(baseGroupX, baseGroupY, baseGroupZ, groupCountX, groupCountY, groupCountZ, where);
+    }
+
     // ---- Recording lifecycle --------------------------------------------------------------
     //
     // Everything both backends did identically lives here; each supplies only the API call that

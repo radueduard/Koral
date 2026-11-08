@@ -52,8 +52,11 @@ namespace kor::vk
                                      .setPName("main")
                                      .setPNext(descriptors.StageNext());
 
+        // Every compute pipeline can be dispatched from a base workgroup (CommandBuffer::DispatchBase): a grid larger than a
+        // dispatch counts runs as several. Under the heap the flag goes with the heap's, which are what is read then.
         const auto pipelineCreateInfo = ::vk::ComputePipelineCreateInfo()
-                                        .setPNext(descriptors.CreateNext(nullptr))
+                                        .setFlags(::vk::PipelineCreateFlagBits::eDispatchBase)
+                                        .setPNext(descriptors.CreateNext(nullptr, VK_PIPELINE_CREATE_2_DISPATCH_BASE_BIT))
                                         .setStage(stageCreateInfo)
                                         .setLayout(_pipelineLayout);
 

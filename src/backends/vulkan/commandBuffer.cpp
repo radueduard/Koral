@@ -706,6 +706,17 @@ namespace kor::vk
         }, PassEdge::eNone, UsesForBoundResources(false), BoundPipelineUsesDeviceAddresses());
     }
 
+    kor::CommandBuffer& CommandBuffer::DoDispatchBase(const kor::u32 baseX, const kor::u32 baseY, const kor::u32 baseZ,
+                                                      const kor::u32 groupCountX, const kor::u32 groupCountY, const kor::u32 groupCountZ,
+                                                      const std::source_location where)
+    {
+        if (_failed) return *this;
+        // Core since Vulkan 1.1; the pipeline was made with eDispatchBase (ComputePipeline::Create).
+        return deferAt("DispatchBase", where, [=, this] {
+            _handle.dispatchBase(baseX, baseY, baseZ, groupCountX, groupCountY, groupCountZ);
+        }, PassEdge::eNone, UsesForBoundResources(false), BoundPipelineUsesDeviceAddresses());
+    }
+
     kor::CommandBuffer & CommandBuffer::DoDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);

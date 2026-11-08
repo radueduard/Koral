@@ -707,6 +707,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_insert_debug_label(IntPtr commands, string? label, float* color);
     [LibraryImport(Library)] internal static partial void koral_cmd_dispatch(IntPtr commands, uint x, uint y, uint z);
     [LibraryImport(Library)] internal static partial void koral_cmd_dispatch_indirect(IntPtr commands, IntPtr buffer, ulong offset);
+    [LibraryImport(Library)] internal static partial void koral_cmd_dispatch_base(IntPtr commands, uint base_x, uint base_y, uint base_z, uint x, uint y, uint z);
     [LibraryImport(Library)] internal static partial void koral_cmd_trace_rays(IntPtr commands, uint width, uint height, uint depth);
     [LibraryImport(Library)] internal static partial void koral_cmd_draw(IntPtr commands, ulong vertex_count, uint instance_count, uint first_vertex, uint first_instance);
     [LibraryImport(Library)] internal static partial void koral_cmd_draw_indexed(IntPtr commands, ulong index_count, uint instance_count, uint first_index, int vertex_offset, uint first_instance);

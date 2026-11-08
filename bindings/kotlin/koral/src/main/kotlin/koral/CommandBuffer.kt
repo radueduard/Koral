@@ -263,6 +263,8 @@ class CommandBuffer internal constructor(native: MemorySegment, private val owne
 
     fun dispatch(groupCountX: Int = 1, groupCountY: Int = 1, groupCountZ: Int = 1) = apply { KoralNative.koral_cmd_dispatch(n, groupCountX, groupCountY, groupCountZ) }
     fun dispatchIndirect(buffer: Buffer, offset: Long = 0) = apply { KoralNative.koral_cmd_dispatch_indirect(n, buffer.native, offset) }
+    /** The workgroups from (baseGroupX, baseGroupY, baseGroupZ) on, so many each way: the shader sees them as the whole grid numbers them. */
+    fun dispatchBase(baseGroupX: Int, baseGroupY: Int, baseGroupZ: Int, groupCountX: Int = 1, groupCountY: Int = 1, groupCountZ: Int = 1) = apply { KoralNative.koral_cmd_dispatch_base(n, baseGroupX, baseGroupY, baseGroupZ, groupCountX, groupCountY, groupCountZ) }
     fun traceRays(width: Int = 1, height: Int = 1, depth: Int = 1) = apply { KoralNative.koral_cmd_trace_rays(n, width, height, depth) }
     /** Draw: every vertex of the bound mesh, by default. */
     fun draw(vertexCount: Long = WholeSize, instanceCount: Int = 1, firstVertex: Int = 0, firstInstance: Int = 0) = apply {

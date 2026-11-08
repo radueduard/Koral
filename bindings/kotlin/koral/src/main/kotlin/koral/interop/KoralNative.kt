@@ -991,6 +991,8 @@ object KoralNative {
     fun koral_cmd_dispatch(commands: MemorySegment, x: Int, y: Int, z: Int): Unit { h_koral_cmd_dispatch.invokeExact(commands, x, y, z) }
     private val h_koral_cmd_dispatch_indirect by lazy { handle("koral_cmd_dispatch_indirect", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_LONG)) }
     fun koral_cmd_dispatch_indirect(commands: MemorySegment, buffer: MemorySegment, offset: Long): Unit { h_koral_cmd_dispatch_indirect.invokeExact(commands, buffer, offset) }
+    private val h_koral_cmd_dispatch_base by lazy { handle("koral_cmd_dispatch_base", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_cmd_dispatch_base(commands: MemorySegment, base_x: Int, base_y: Int, base_z: Int, x: Int, y: Int, z: Int): Unit { h_koral_cmd_dispatch_base.invokeExact(commands, base_x, base_y, base_z, x, y, z) }
     private val h_koral_cmd_trace_rays by lazy { handle("koral_cmd_trace_rays", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, JAVA_INT, JAVA_INT)) }
     fun koral_cmd_trace_rays(commands: MemorySegment, width: Int, height: Int, depth: Int): Unit { h_koral_cmd_trace_rays.invokeExact(commands, width, height, depth) }
     private val h_koral_cmd_draw by lazy { handle("koral_cmd_draw", FunctionDescriptor.ofVoid(ADDRESS, JAVA_LONG, JAVA_INT, JAVA_INT, JAVA_INT)) }

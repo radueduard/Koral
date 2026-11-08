@@ -58,9 +58,10 @@ namespace kor::vk
 
         /**
          * @brief Chains what the pipeline's create info needs in front of @p next: the heap pipeline flag
-         *        under the heap; @p next unchanged under sets.
+         *        under the heap; @p next unchanged under sets. @p alsoFlags are flags the pipeline has besides: under the
+         *        heap they go here too, as the create info's own flags are not read once these are chained.
          */
-        [[nodiscard]] const void* CreateNext(const void* next);
+        [[nodiscard]] const void* CreateNext(const void* next, VkPipelineCreateFlags2 alsoFlags = 0);
 
     private:
         bool _heap = false;

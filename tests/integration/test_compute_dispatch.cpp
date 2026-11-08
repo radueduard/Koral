@@ -85,6 +85,46 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
 }
 
 
+// A dispatch from a base workgroup: the shader's ids start there, as the whole grid numbers them. Two parts make the
+// whole — what a grid larger than one dispatch can count is run as — and a part on its own leaves the rest alone.
+TEST_F(GpuTest, ADispatchFromABaseIsThatPartOfTheGrid) {
+    std::vector<std::uint32_t> input(kCount);
+    std::iota(input.begin(), input.end(), 1u);
+
+    Buffer::Builder<std::uint32_t> bufBuilder;
+    bufBuilder.SetData(input);
+    bufBuilder.SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    auto buffer = bufBuilder.Build();
+    ASSERT_TRUE(buffer.Valid());
+
+    Shader::Builder shaderBuilder;
+    shaderBuilder.SetPath("doubleValues.comp.glsl");
+    auto shader = shaderBuilder.Build();
+    ComputePipeline::Builder pipeBuilder;
+    pipeBuilder.SetComputeShader(shader);
+    auto pipeline = pipeBuilder.Build();
+    ASSERT_TRUE(pipeline.Valid());
+    auto descriptorSet = DescriptorSet::Builder(pipeline, 0).Write(0, buffer).Build();
+
+    constexpr std::uint32_t groups = kCount / kLocalSize;
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, descriptorSet);
+        cb.DispatchBase(1, 0, 0, groups - 1, 1, 1);       // all but the first group: doubled once
+        cb.DispatchBase(0, 0, 0, 1, 1, 1);                // the first, from 0: as Dispatch
+        cb.DispatchBase(groups - 1, 0, 0, 1, 1, 1);       // the last again: doubled twice
+        EXPECT_TRUE(cb.Ok()) << "recording failed: " << cb.Outcome().error().ToString();
+    }, CommandBuffer::Usage::eCompute).Wait();
+
+    const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
+    ASSERT_EQ(output.size(), input.size());
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        const std::uint32_t times = i >= (groups - 1) * kLocalSize ? 4u : 2u;
+        EXPECT_EQ(output[i], input[i] * times) << "at index " << i;
+    }
+}
+
+
 // The decisive test for automatic barriers: two dispatches in a row, both reading and
 // writing the same storage buffer, with nothing in between. The second must observe the
 // first, so the engine has to insert a barrier between them -- there is no other machinery

@@ -149,10 +149,10 @@ namespace kor::vk
         _mappingInfo.pMappings = _mappings.data();
     }
 
-    const void* PipelineInterface::CreateNext(const void* next)
+    const void* PipelineInterface::CreateNext(const void* next, const VkPipelineCreateFlags2 alsoFlags)
     {
         if (!_heap) return next;
-        _flags.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT;
+        _flags.flags = VK_PIPELINE_CREATE_2_DESCRIPTOR_HEAP_BIT_EXT | alsoFlags;
         _flags.pNext = next;
         return &_flags;
     }

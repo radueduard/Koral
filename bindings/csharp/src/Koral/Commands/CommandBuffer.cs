@@ -402,6 +402,8 @@ public sealed unsafe partial class CommandBuffer : IDisposable
 
     public CommandBuffer Dispatch(uint groupCountX = 1, uint groupCountY = 1, uint groupCountZ = 1) { KoralNative.koral_cmd_dispatch(N, groupCountX, groupCountY, groupCountZ); return this; }
     public CommandBuffer DispatchIndirect(Buffer indirectBuffer, ulong offset = 0) { KoralNative.koral_cmd_dispatch_indirect(N, indirectBuffer.Handle, offset); return this; }
+    /// <summary>The workgroups from (baseGroupX, baseGroupY, baseGroupZ) on, so many each way: the shader sees them as the whole grid numbers them.</summary>
+    public CommandBuffer DispatchBase(uint baseGroupX, uint baseGroupY, uint baseGroupZ, uint groupCountX = 1, uint groupCountY = 1, uint groupCountZ = 1) { KoralNative.koral_cmd_dispatch_base(N, baseGroupX, baseGroupY, baseGroupZ, groupCountX, groupCountY, groupCountZ); return this; }
     public CommandBuffer TraceRays(uint width = 1, uint height = 1, uint depth = 1) { KoralNative.koral_cmd_trace_rays(N, width, height, depth); return this; }
     public CommandBuffer Draw(ulong vertexCount = WholeSize, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0)
     {

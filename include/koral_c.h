@@ -724,6 +724,9 @@ KORAL_API void koral_cmd_end_debug_label(KoralCommandBuffer* commands);
 KORAL_API void koral_cmd_insert_debug_label(KoralCommandBuffer* commands, const char* label, const float color[4]);
 KORAL_API void koral_cmd_dispatch(KoralCommandBuffer* commands, uint32_t x, uint32_t y, uint32_t z);
 KORAL_API void koral_cmd_dispatch_indirect(KoralCommandBuffer* commands, KoralBuffer* buffer, uint64_t offset);
+/** DispatchBase: the workgroups from (base_x, base_y, base_z) on, so many each way; the shader sees them as the whole grid's. */
+KORAL_API void koral_cmd_dispatch_base(KoralCommandBuffer* commands, uint32_t base_x, uint32_t base_y, uint32_t base_z,
+                                        uint32_t x, uint32_t y, uint32_t z);
 KORAL_API void koral_cmd_trace_rays(KoralCommandBuffer* commands, uint32_t width, uint32_t height, uint32_t depth);
 KORAL_API void koral_cmd_draw(KoralCommandBuffer* commands, uint64_t vertex_count, uint32_t instance_count,
                                uint32_t first_vertex, uint32_t first_instance);

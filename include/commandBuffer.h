@@ -931,6 +931,22 @@ namespace kor
                                         std::source_location where = std::source_location::current());
 
         /**
+         * @brief Runs the bound compute pipeline over part of a grid of workgroups: the groups from @p baseGroupX,
+         *        @p baseGroupY, @p baseGroupZ on, so many each way (vkCmdDispatchBase).
+         * @param baseGroupX,baseGroupY,baseGroupZ The first workgroup of the part, each way.
+         * @param groupCountX,groupCountY,groupCountZ Number of workgroups per axis, from there.
+         *
+         * The shader sees the workgroups as the whole grid numbers them: SV_GroupID (gl_WorkGroupID) and
+         * SV_DispatchThreadID (gl_GlobalInvocationID) start at the base. So a grid larger than one dispatch can count
+         * along an axis (maxComputeWorkGroupCount: 65,535 along y and z on most devices) runs as several, one after
+         * another, and the shader is none the wiser. Every compute pipeline is made so that it can be dispatched so.
+         * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
+         */
+        CommandBuffer& DispatchBase(kor::u32 baseGroupX, kor::u32 baseGroupY, kor::u32 baseGroupZ,
+                                    kor::u32 groupCountX = 1, kor::u32 groupCountY = 1, kor::u32 groupCountZ = 1,
+                                    std::source_location where = std::source_location::current());
+
+        /**
          * @brief Casts a grid of rays through the bound ray-tracing pipeline.
          * @param width,height,depth Size of the ray grid, usually the target image's dimensions.
          *
@@ -1652,6 +1668,8 @@ namespace kor
         virtual CommandBuffer& DoBindVertexBuffer(kor::u32 binding, ResourceRef<const Buffer> buffer, kor::u64 offset) = 0;
         virtual CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;
         virtual CommandBuffer& DoDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset) = 0;
+        virtual CommandBuffer& DoDispatchBase(kor::u32 baseX, kor::u32 baseY, kor::u32 baseZ,
+                                              kor::u32 groupCountX, kor::u32 groupCountY, kor::u32 groupCountZ, std::source_location where) = 0;
         virtual CommandBuffer& DoDrawIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) = 0;
         virtual CommandBuffer& DoDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) = 0;
         virtual CommandBuffer& DoDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) { return *this; }

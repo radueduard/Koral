@@ -270,6 +270,7 @@ void koral_cmd_end_debug_label(KoralCommandBuffer* c) { Record(c, [](auto& x) { 
 void koral_cmd_insert_debug_label(KoralCommandBuffer* c, const char* label, const float color[4]) { Record(c, [&](auto& x) { x.InsertDebugLabel(label ? label : "", Vec4Of(color)); }); }
 void koral_cmd_dispatch(KoralCommandBuffer* c, const uint32_t x_, const uint32_t y, const uint32_t z) { Record(c, [&](auto& x) { x.Dispatch(x_, y, z); }); }
 void koral_cmd_dispatch_indirect(KoralCommandBuffer* c, KoralBuffer* b, const uint64_t o) { Record(c, [&](auto& x) { x.DispatchIndirect(RefOf<Buffer>(b), o); }); }
+void koral_cmd_dispatch_base(KoralCommandBuffer* c, const uint32_t bx, const uint32_t by, const uint32_t bz, const uint32_t x_, const uint32_t y, const uint32_t z) { Record(c, [&](auto& x) { x.DispatchBase(bx, by, bz, x_, y, z); }); }
 void koral_cmd_trace_rays(KoralCommandBuffer* c, const uint32_t w, const uint32_t h, const uint32_t d) { Record(c, [&](auto& x) { x.TraceRays(w, h, d); }); }
 void koral_cmd_draw(KoralCommandBuffer* c, const uint64_t vertices, const uint32_t instances, const uint32_t firstVertex, const uint32_t firstInstance)
 {

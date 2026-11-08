@@ -65,6 +65,8 @@ namespace kor::vk
         kor::CommandBuffer& DoInsertDebugLabel(const std::string& label, kor::Vec4 color) override;
         kor::CommandBuffer& DoDispatch(kor::u32 groupCountX, kor::u32 groupCountY, kor::u32 groupCountZ, std::source_location where) override;
         kor::CommandBuffer& DoDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset) override;
+        kor::CommandBuffer& DoDispatchBase(kor::u32 baseX, kor::u32 baseY, kor::u32 baseZ,
+                                           kor::u32 groupCountX, kor::u32 groupCountY, kor::u32 groupCountZ, std::source_location where) override;
         kor::CommandBuffer& DoTraceRays(kor::u32 width, kor::u32 height, kor::u32 depth, std::source_location where) override;
         kor::CommandBuffer& DoDraw(kor::u64 vertexCount, kor::u32 instanceCount, kor::u32 firstVertex, kor::u32 firstInstance, std::source_location where) override;
         kor::CommandBuffer& DoDrawIndexed(kor::u64 indexCount, kor::u32 instanceCount, kor::u32 firstIndex, kor::i32 vertexOffset, kor::u32 firstInstance, std::source_location where) override;
