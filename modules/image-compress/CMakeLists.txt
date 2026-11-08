@@ -50,7 +50,7 @@ if(UNIX AND NOT APPLE)
     target_link_options(koral-image-compress PRIVATE -Wl,--allow-multiple-definition)
 endif()
 if(MSVC)
-    target_link_options(koral-image-compress PRIVATE /FORCE:MULTIPLE /IGNORE:4006 /IGNORE:4088)
+    target_link_options(koral-image-compress PRIVATE /MANIFEST:NO /FORCE:MULTIPLE /IGNORE:4006 /IGNORE:4088)
 endif()
 
 # Into <libKoral's dir>/modules, where the loader looks without configuration.

@@ -55,3 +55,8 @@ install(TARGETS koral-mesh
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/modules/koral-mesh
         FILES_MATCHING PATTERN "*.h")
+
+if(MSVC)
+    # No manifest of its own, for the same reason as koral-ui's: see modules/ui/CMakeLists.txt.
+    target_link_options(koral-mesh PRIVATE /MANIFEST:NO)
+endif()

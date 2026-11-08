@@ -81,3 +81,8 @@ install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/modules/koral
 # any project without a path being registered anywhere.
 install(DIRECTORY shaders/ DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/shaders)
 
+
+if(MSVC)
+    # No manifest of its own, for the same reason as koral-ui's: see modules/ui/CMakeLists.txt.
+    target_link_options(koral-camera PRIVATE /MANIFEST:NO)
+endif()
