@@ -37,6 +37,14 @@ TEST(DebugDraw, EachShapeIsTheLinesItShouldBe) {
         << "an orthographic one is a box, open at the far end";
 }
 
+TEST(DebugDraw, NoImageIsNotDrawn) {
+    kor::DebugDraw draw;
+    draw.Image({0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, kor::ResourceRef<const kor::Image>{});
+    draw.Image({0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, kor::ResourceRef<const kor::ImageView>{});
+    EXPECT_EQ(draw.ImageCount(), 0u);
+    EXPECT_EQ(draw.LineCount(), 0u) << "and has no outline";
+}
+
 TEST(DebugDraw, FillsAreTrianglesAndTheOutlineIsOptional) {
     kor::DebugDraw draw;
     const kor::DebugStyle filled {.fill = {1, 0, 0, 0.5f}, .outline = false};

@@ -10,6 +10,13 @@ public static partial class KMath
     public static Vec3 LinearToSrgb(Vec3 c) => new(LinearToSrgb(c.X), LinearToSrgb(c.Y), LinearToSrgb(c.Z));
     public static Vec4 SrgbToLinear(Vec4 c) => new(SrgbToLinear((Vec3)c), c.W);
     public static Vec4 LinearToSrgb(Vec4 c) => new(LinearToSrgb((Vec3)c), c.W);
+    /// <summary>A colour as an RGBA8 texel: each channel clamped to [0, 1] and rounded, as the GPU packs it.</summary>
+    public static U8Vec4 ToU8Vec4(Vec4 c)
+    {
+        var p = PackUnorm4x8(c);
+        return new U8Vec4((byte)p, (byte)(p >> 8), (byte)(p >> 16), (byte)(p >> 24));
+    }
+    public static Vec4 FromU8Vec4(U8Vec4 c) => (Vec4)c / 255f;
 
     /// <summary>0xRRGGBB as an opaque colour, channels in [0, 1].</summary>
     public static Vec4 ColorFromHex(uint rgb) => new(((rgb >> 16) & 0xff) / 255f, ((rgb >> 8) & 0xff) / 255f, (rgb & 0xff) / 255f, 1f);

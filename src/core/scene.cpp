@@ -208,6 +208,8 @@ namespace kor
     // ---- Debug:: ------------------------------------------------------------------------------------
 
     kor::DebugDraw& Scene::Debug::Get() { return required("Debug").SceneDebug(); }
+    void Scene::Debug::BeginLogicSpace(const kor::Vec2 size) { Get().BeginLogicSpace(size); }
+    void Scene::Debug::EndLogicSpace() { Get().EndLogicSpace(); }
     void Scene::Debug::Line(const kor::Vec3 from, const kor::Vec3 to, const Style& style) { Get().Line(from, to, style); }
     void Scene::Debug::Box(const kor::Vec3 min, const kor::Vec3 max, const Style& style) { Get().Box(min, max, style); }
     void Scene::Debug::Box(const kor::Mat4& transform, const Style& style) { Get().Box(transform, style); }
@@ -223,6 +225,10 @@ namespace kor
     void Scene::Debug::Cylinder(const kor::Vec3 from, const kor::Vec3 to, const float radius, const Style& style) { Get().Cylinder(from, to, radius, style); }
     void Scene::Debug::Cone(const kor::Vec3 base, const kor::Vec3 tip, const float radius, const Style& style) { Get().Cone(base, tip, radius, style); }
     void Scene::Debug::Capsule(const kor::Vec3 from, const kor::Vec3 to, const float radius, const Style& style) { Get().Capsule(from, to, radius, style); }
+    void Scene::Debug::Image(const kor::Vec3 a, const kor::Vec3 b, const kor::Vec3 c, const kor::Vec3 d, const ResourceRef<const kor::Image>& image,
+                             const ResourceRef<const Sampler>& sampler, const Style& style) { Get().Image(a, b, c, d, image, sampler, style); }
+    void Scene::Debug::Image(const kor::Vec3 a, const kor::Vec3 b, const kor::Vec3 c, const kor::Vec3 d, const ResourceRef<const ImageView>& view,
+                             const ResourceRef<const Sampler>& sampler, const Style& style) { Get().Image(a, b, c, d, view, sampler, style); }
     void Scene::Debug::Camera(const kor::Mat4& view, const kor::Mat4& projection, const float size, const Style& style) { Get().Camera(view, projection, size, style); }
     void Scene::Debug::PointLight(const kor::Vec3 position, const float range, const Style& style) { Get().PointLight(position, range, style); }
     void Scene::Debug::SpotLight(const kor::Vec3 position, const kor::Vec3 direction, const float range, const float outerAngle,

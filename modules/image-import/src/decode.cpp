@@ -19,10 +19,17 @@
 
 namespace kimg::detail
 {
+    /** A path as UTF-8: what OIIO takes a file name as, and what a message is in — not the narrow string of Windows' code page. */
+    std::string utf8(const std::filesystem::path& path)
+    {
+        const std::u8string text = path.u8string();
+        return std::string(text.begin(), text.end());
+    }
+
     kor::Error fileError(const std::filesystem::path& path, std::string what)
     {
         return kor::Error{ .code = kor::ErrorCode::eInvalidArgument,
-                           .message = std::format("{}: {}", path.string(), std::move(what)) };
+                           .message = std::format("{}: {}", utf8(path), std::move(what)) };
     }
 
     kor::Resource<kor::Image> poisoned(const std::filesystem::path& path, std::string what)
@@ -109,7 +116,7 @@ namespace kimg::detail
 
     std::expected<CpuImage, kor::Error> decodeFile(const std::filesystem::path& path)
     {
-        const auto input = OIIO::ImageInput::open(path.string());
+        const auto input = OIIO::ImageInput::open(utf8(path));
         if (!input) {
             return std::unexpected(fileError(path, "could not be opened (" + OIIO::geterror() + ")"));
         }

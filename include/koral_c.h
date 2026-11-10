@@ -84,6 +84,7 @@ typedef enum KoralResourceKind {
 } KoralResourceKind;
 
 /** Frees the handle — and, for an owned one, the resource. Null is fine. */
+/* An owned resource released while a frame records goes when that frame has been submitted: its commands may name it. */
 KORAL_API void koral_resource_release(KoralResource* resource);
 /** A new, borrowed handle onto the same resource (a ResourceRef). */
 KORAL_API KoralResource* koral_resource_borrow(KoralResource* resource);
@@ -1147,12 +1148,20 @@ KORAL_API void koral_debug_axes(KoralDebugDraw* draw, const float transform[16],
 KORAL_API void koral_debug_grid(KoralDebugDraw* draw, const float center[3], float size, int cells, const KoralDebugStyle* style);
 KORAL_API void koral_debug_frustum(KoralDebugDraw* draw, const float view_projection[16], const KoralDebugStyle* style);
 KORAL_API void koral_debug_clear(KoralDebugDraw* draw);
+KORAL_API void koral_debug_begin_logic_space(KoralDebugDraw* draw, float width, float height);
+KORAL_API void koral_debug_end_logic_space(KoralDebugDraw* draw);
 KORAL_API uint64_t koral_debug_line_count(KoralDebugDraw* draw);
 KORAL_API void koral_debug_triangle(KoralDebugDraw* draw, const float a[3], const float b[3], const float c[3], const KoralDebugStyle* style);
 KORAL_API void koral_debug_quad(KoralDebugDraw* draw, const float a[3], const float b[3], const float c[3], const float d[3],
                                 const KoralDebugStyle* style);
 KORAL_API void koral_debug_plane(KoralDebugDraw* draw, const float center[3], const float normal[3], const float size[2],
                                  const KoralDebugStyle* style);
+/* An image on four corners in order around the edge, from its bottom left. A null sampler is linear, clamped to the edges. */
+KORAL_API void koral_debug_image(KoralDebugDraw* draw, const float a[3], const float b[3], const float c[3], const float d[3],
+                                 KoralImage* image, KoralSampler* sampler, const KoralDebugStyle* style);
+KORAL_API void koral_debug_image_view(KoralDebugDraw* draw, const float a[3], const float b[3], const float c[3], const float d[3],
+                                      KoralImageView* view, KoralSampler* sampler, const KoralDebugStyle* style);
+KORAL_API uint64_t koral_debug_image_count(KoralDebugDraw* draw);
 KORAL_API void koral_debug_cylinder(KoralDebugDraw* draw, const float from[3], const float to[3], float radius,
                                     const KoralDebugStyle* style, int segments);
 KORAL_API void koral_debug_cone(KoralDebugDraw* draw, const float base[3], const float tip[3], float radius, const KoralDebugStyle* style,

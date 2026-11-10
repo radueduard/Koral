@@ -5,7 +5,7 @@
 package koral
 
 /** kor::Vec2: 2 Floats, immutable. */
-data class Vec2(val x: Float, val y: Float) {
+data class Vec2(var x: Float, var y: Float) {
     constructor(s: Float) : this(s, s)
     /** The first 2 of a Vec3 (C++'s explicit conversion). */
     constructor(v: Vec3) : this(v.x, v.y)
@@ -33,10 +33,10 @@ data class Vec2(val x: Float, val y: Float) {
     override fun toString() = "($x, $y)"
 
     companion object {
-        val Zero = Vec2(0f)
-        val One = Vec2(1f)
-        val UnitX = Vec2(1f, 0f)
-        val UnitY = Vec2(0f, 1f)
+        val Zero get() = Vec2(0f)
+        val One get() = Vec2(1f)
+        val UnitX get() = Vec2(1f, 0f)
+        val UnitY get() = Vec2(0f, 1f)
     }
 }
 operator fun Float.plus(v: Vec2) = Vec2(this + v.x, this + v.y)
@@ -45,7 +45,7 @@ operator fun Float.times(v: Vec2) = Vec2(this * v.x, this * v.y)
 operator fun Float.div(v: Vec2) = Vec2(this / v.x, this / v.y)
 
 /** kor::Vec3: 3 Floats, immutable. */
-data class Vec3(val x: Float, val y: Float, val z: Float) {
+data class Vec3(var x: Float, var y: Float, var z: Float) {
     constructor(s: Float) : this(s, s, s)
     constructor(xy: Vec2, z: Float) : this(xy.x, xy.y, z)
     constructor(x: Float, yz: Vec2) : this(x, yz.x, yz.y)
@@ -73,17 +73,17 @@ data class Vec3(val x: Float, val y: Float, val z: Float) {
     override fun toString() = "($x, $y, $z)"
 
     companion object {
-        val Zero = Vec3(0f)
-        val One = Vec3(1f)
-        val UnitX = Vec3(1f, 0f, 0f)
-        val UnitY = Vec3(0f, 1f, 0f)
-        val UnitZ = Vec3(0f, 0f, 1f)
-        val Up = Vec3(0f, 1f, 0f)
-        val Down = Vec3(0f, -1f, 0f)
-        val Right = Vec3(1f, 0f, 0f)
-        val Left = Vec3(-1f, 0f, 0f)
-        val Forward = Vec3(0f, 0f, -1f)
-        val Back = Vec3(0f, 0f, 1f)
+        val Zero get() = Vec3(0f)
+        val One get() = Vec3(1f)
+        val UnitX get() = Vec3(1f, 0f, 0f)
+        val UnitY get() = Vec3(0f, 1f, 0f)
+        val UnitZ get() = Vec3(0f, 0f, 1f)
+        val Up get() = Vec3(0f, 1f, 0f)
+        val Down get() = Vec3(0f, -1f, 0f)
+        val Right get() = Vec3(1f, 0f, 0f)
+        val Left get() = Vec3(-1f, 0f, 0f)
+        val Forward get() = Vec3(0f, 0f, -1f)
+        val Back get() = Vec3(0f, 0f, 1f)
     }
 }
 operator fun Float.plus(v: Vec3) = Vec3(this + v.x, this + v.y, this + v.z)
@@ -92,7 +92,7 @@ operator fun Float.times(v: Vec3) = Vec3(this * v.x, this * v.y, this * v.z)
 operator fun Float.div(v: Vec3) = Vec3(this / v.x, this / v.y, this / v.z)
 
 /** kor::Vec4: 4 Floats, immutable. */
-data class Vec4(val x: Float, val y: Float, val z: Float, val w: Float) {
+data class Vec4(var x: Float, var y: Float, var z: Float, var w: Float) {
     constructor(s: Float) : this(s, s, s, s)
     constructor(xyz: Vec3, w: Float) : this(xyz.x, xyz.y, xyz.z, w)
     constructor(x: Float, yzw: Vec3) : this(x, yzw.x, yzw.y, yzw.z)
@@ -122,12 +122,12 @@ data class Vec4(val x: Float, val y: Float, val z: Float, val w: Float) {
     override fun toString() = "($x, $y, $z, $w)"
 
     companion object {
-        val Zero = Vec4(0f)
-        val One = Vec4(1f)
-        val UnitX = Vec4(1f, 0f, 0f, 0f)
-        val UnitY = Vec4(0f, 1f, 0f, 0f)
-        val UnitZ = Vec4(0f, 0f, 1f, 0f)
-        val UnitW = Vec4(0f, 0f, 0f, 1f)
+        val Zero get() = Vec4(0f)
+        val One get() = Vec4(1f)
+        val UnitX get() = Vec4(1f, 0f, 0f, 0f)
+        val UnitY get() = Vec4(0f, 1f, 0f, 0f)
+        val UnitZ get() = Vec4(0f, 0f, 1f, 0f)
+        val UnitW get() = Vec4(0f, 0f, 0f, 1f)
     }
 }
 operator fun Float.plus(v: Vec4) = Vec4(this + v.x, this + v.y, this + v.z, this + v.w)
@@ -136,7 +136,7 @@ operator fun Float.times(v: Vec4) = Vec4(this * v.x, this * v.y, this * v.z, thi
 operator fun Float.div(v: Vec4) = Vec4(this / v.x, this / v.y, this / v.z, this / v.w)
 
 /** kor::DVec2: 2 Doubles, immutable. */
-data class DVec2(val x: Double, val y: Double) {
+data class DVec2(var x: Double, var y: Double) {
     constructor(s: Double) : this(s, s)
     /** The first 2 of a DVec3 (C++'s explicit conversion). */
     constructor(v: DVec3) : this(v.x, v.y)
@@ -164,10 +164,10 @@ data class DVec2(val x: Double, val y: Double) {
     override fun toString() = "($x, $y)"
 
     companion object {
-        val Zero = DVec2(0.0)
-        val One = DVec2(1.0)
-        val UnitX = DVec2(1.0, 0.0)
-        val UnitY = DVec2(0.0, 1.0)
+        val Zero get() = DVec2(0.0)
+        val One get() = DVec2(1.0)
+        val UnitX get() = DVec2(1.0, 0.0)
+        val UnitY get() = DVec2(0.0, 1.0)
     }
 }
 operator fun Double.plus(v: DVec2) = DVec2(this + v.x, this + v.y)
@@ -176,7 +176,7 @@ operator fun Double.times(v: DVec2) = DVec2(this * v.x, this * v.y)
 operator fun Double.div(v: DVec2) = DVec2(this / v.x, this / v.y)
 
 /** kor::DVec3: 3 Doubles, immutable. */
-data class DVec3(val x: Double, val y: Double, val z: Double) {
+data class DVec3(var x: Double, var y: Double, var z: Double) {
     constructor(s: Double) : this(s, s, s)
     constructor(xy: DVec2, z: Double) : this(xy.x, xy.y, z)
     constructor(x: Double, yz: DVec2) : this(x, yz.x, yz.y)
@@ -204,17 +204,17 @@ data class DVec3(val x: Double, val y: Double, val z: Double) {
     override fun toString() = "($x, $y, $z)"
 
     companion object {
-        val Zero = DVec3(0.0)
-        val One = DVec3(1.0)
-        val UnitX = DVec3(1.0, 0.0, 0.0)
-        val UnitY = DVec3(0.0, 1.0, 0.0)
-        val UnitZ = DVec3(0.0, 0.0, 1.0)
-        val Up = DVec3(0.0, 1.0, 0.0)
-        val Down = DVec3(0.0, -1.0, 0.0)
-        val Right = DVec3(1.0, 0.0, 0.0)
-        val Left = DVec3(-1.0, 0.0, 0.0)
-        val Forward = DVec3(0.0, 0.0, -1.0)
-        val Back = DVec3(0.0, 0.0, 1.0)
+        val Zero get() = DVec3(0.0)
+        val One get() = DVec3(1.0)
+        val UnitX get() = DVec3(1.0, 0.0, 0.0)
+        val UnitY get() = DVec3(0.0, 1.0, 0.0)
+        val UnitZ get() = DVec3(0.0, 0.0, 1.0)
+        val Up get() = DVec3(0.0, 1.0, 0.0)
+        val Down get() = DVec3(0.0, -1.0, 0.0)
+        val Right get() = DVec3(1.0, 0.0, 0.0)
+        val Left get() = DVec3(-1.0, 0.0, 0.0)
+        val Forward get() = DVec3(0.0, 0.0, -1.0)
+        val Back get() = DVec3(0.0, 0.0, 1.0)
     }
 }
 operator fun Double.plus(v: DVec3) = DVec3(this + v.x, this + v.y, this + v.z)
@@ -223,7 +223,7 @@ operator fun Double.times(v: DVec3) = DVec3(this * v.x, this * v.y, this * v.z)
 operator fun Double.div(v: DVec3) = DVec3(this / v.x, this / v.y, this / v.z)
 
 /** kor::DVec4: 4 Doubles, immutable. */
-data class DVec4(val x: Double, val y: Double, val z: Double, val w: Double) {
+data class DVec4(var x: Double, var y: Double, var z: Double, var w: Double) {
     constructor(s: Double) : this(s, s, s, s)
     constructor(xyz: DVec3, w: Double) : this(xyz.x, xyz.y, xyz.z, w)
     constructor(x: Double, yzw: DVec3) : this(x, yzw.x, yzw.y, yzw.z)
@@ -253,12 +253,12 @@ data class DVec4(val x: Double, val y: Double, val z: Double, val w: Double) {
     override fun toString() = "($x, $y, $z, $w)"
 
     companion object {
-        val Zero = DVec4(0.0)
-        val One = DVec4(1.0)
-        val UnitX = DVec4(1.0, 0.0, 0.0, 0.0)
-        val UnitY = DVec4(0.0, 1.0, 0.0, 0.0)
-        val UnitZ = DVec4(0.0, 0.0, 1.0, 0.0)
-        val UnitW = DVec4(0.0, 0.0, 0.0, 1.0)
+        val Zero get() = DVec4(0.0)
+        val One get() = DVec4(1.0)
+        val UnitX get() = DVec4(1.0, 0.0, 0.0, 0.0)
+        val UnitY get() = DVec4(0.0, 1.0, 0.0, 0.0)
+        val UnitZ get() = DVec4(0.0, 0.0, 1.0, 0.0)
+        val UnitW get() = DVec4(0.0, 0.0, 0.0, 1.0)
     }
 }
 operator fun Double.plus(v: DVec4) = DVec4(this + v.x, this + v.y, this + v.z, this + v.w)
@@ -267,7 +267,7 @@ operator fun Double.times(v: DVec4) = DVec4(this * v.x, this * v.y, this * v.z, 
 operator fun Double.div(v: DVec4) = DVec4(this / v.x, this / v.y, this / v.z, this / v.w)
 
 /** kor::IVec2: 2 Ints, immutable. */
-data class IVec2(val x: Int, val y: Int) {
+data class IVec2(var x: Int, var y: Int) {
     constructor(s: Int) : this(s, s)
     /** The first 2 of a IVec3 (C++'s explicit conversion). */
     constructor(v: IVec3) : this(v.x, v.y)
@@ -308,10 +308,10 @@ data class IVec2(val x: Int, val y: Int) {
     override fun toString() = "($x, $y)"
 
     companion object {
-        val Zero = IVec2(0)
-        val One = IVec2(1)
-        val UnitX = IVec2(1, 0)
-        val UnitY = IVec2(0, 1)
+        val Zero get() = IVec2(0)
+        val One get() = IVec2(1)
+        val UnitX get() = IVec2(1, 0)
+        val UnitY get() = IVec2(0, 1)
     }
 }
 operator fun Int.plus(v: IVec2) = IVec2(this + v.x, this + v.y)
@@ -320,7 +320,7 @@ operator fun Int.times(v: IVec2) = IVec2(this * v.x, this * v.y)
 operator fun Int.div(v: IVec2) = IVec2(this / v.x, this / v.y)
 
 /** kor::IVec3: 3 Ints, immutable. */
-data class IVec3(val x: Int, val y: Int, val z: Int) {
+data class IVec3(var x: Int, var y: Int, var z: Int) {
     constructor(s: Int) : this(s, s, s)
     constructor(xy: IVec2, z: Int) : this(xy.x, xy.y, z)
     constructor(x: Int, yz: IVec2) : this(x, yz.x, yz.y)
@@ -361,17 +361,17 @@ data class IVec3(val x: Int, val y: Int, val z: Int) {
     override fun toString() = "($x, $y, $z)"
 
     companion object {
-        val Zero = IVec3(0)
-        val One = IVec3(1)
-        val UnitX = IVec3(1, 0, 0)
-        val UnitY = IVec3(0, 1, 0)
-        val UnitZ = IVec3(0, 0, 1)
-        val Up = IVec3(0, 1, 0)
-        val Down = IVec3(0, -1, 0)
-        val Right = IVec3(1, 0, 0)
-        val Left = IVec3(-1, 0, 0)
-        val Forward = IVec3(0, 0, -1)
-        val Back = IVec3(0, 0, 1)
+        val Zero get() = IVec3(0)
+        val One get() = IVec3(1)
+        val UnitX get() = IVec3(1, 0, 0)
+        val UnitY get() = IVec3(0, 1, 0)
+        val UnitZ get() = IVec3(0, 0, 1)
+        val Up get() = IVec3(0, 1, 0)
+        val Down get() = IVec3(0, -1, 0)
+        val Right get() = IVec3(1, 0, 0)
+        val Left get() = IVec3(-1, 0, 0)
+        val Forward get() = IVec3(0, 0, -1)
+        val Back get() = IVec3(0, 0, 1)
     }
 }
 operator fun Int.plus(v: IVec3) = IVec3(this + v.x, this + v.y, this + v.z)
@@ -380,7 +380,7 @@ operator fun Int.times(v: IVec3) = IVec3(this * v.x, this * v.y, this * v.z)
 operator fun Int.div(v: IVec3) = IVec3(this / v.x, this / v.y, this / v.z)
 
 /** kor::IVec4: 4 Ints, immutable. */
-data class IVec4(val x: Int, val y: Int, val z: Int, val w: Int) {
+data class IVec4(var x: Int, var y: Int, var z: Int, var w: Int) {
     constructor(s: Int) : this(s, s, s, s)
     constructor(xyz: IVec3, w: Int) : this(xyz.x, xyz.y, xyz.z, w)
     constructor(x: Int, yzw: IVec3) : this(x, yzw.x, yzw.y, yzw.z)
@@ -423,12 +423,12 @@ data class IVec4(val x: Int, val y: Int, val z: Int, val w: Int) {
     override fun toString() = "($x, $y, $z, $w)"
 
     companion object {
-        val Zero = IVec4(0)
-        val One = IVec4(1)
-        val UnitX = IVec4(1, 0, 0, 0)
-        val UnitY = IVec4(0, 1, 0, 0)
-        val UnitZ = IVec4(0, 0, 1, 0)
-        val UnitW = IVec4(0, 0, 0, 1)
+        val Zero get() = IVec4(0)
+        val One get() = IVec4(1)
+        val UnitX get() = IVec4(1, 0, 0, 0)
+        val UnitY get() = IVec4(0, 1, 0, 0)
+        val UnitZ get() = IVec4(0, 0, 1, 0)
+        val UnitW get() = IVec4(0, 0, 0, 1)
     }
 }
 operator fun Int.plus(v: IVec4) = IVec4(this + v.x, this + v.y, this + v.z, this + v.w)
@@ -437,7 +437,7 @@ operator fun Int.times(v: IVec4) = IVec4(this * v.x, this * v.y, this * v.z, thi
 operator fun Int.div(v: IVec4) = IVec4(this / v.x, this / v.y, this / v.z, this / v.w)
 
 /** kor::UVec2: 2 UInts, immutable. */
-data class UVec2(val x: UInt, val y: UInt) {
+data class UVec2(var x: UInt, var y: UInt) {
     constructor(s: UInt) : this(s, s)
     /** The first 2 of a UVec3 (C++'s explicit conversion). */
     constructor(v: UVec3) : this(v.x, v.y)
@@ -477,10 +477,10 @@ data class UVec2(val x: UInt, val y: UInt) {
     override fun toString() = "($x, $y)"
 
     companion object {
-        val Zero = UVec2(0u)
-        val One = UVec2(1u)
-        val UnitX = UVec2(1u, 0u)
-        val UnitY = UVec2(0u, 1u)
+        val Zero get() = UVec2(0u)
+        val One get() = UVec2(1u)
+        val UnitX get() = UVec2(1u, 0u)
+        val UnitY get() = UVec2(0u, 1u)
     }
 }
 /** A UVec2 from Ints, as their bits: `UVec2(1, 2)`. */
@@ -491,7 +491,7 @@ operator fun UInt.times(v: UVec2) = UVec2(this * v.x, this * v.y)
 operator fun UInt.div(v: UVec2) = UVec2(this / v.x, this / v.y)
 
 /** kor::UVec3: 3 UInts, immutable. */
-data class UVec3(val x: UInt, val y: UInt, val z: UInt) {
+data class UVec3(var x: UInt, var y: UInt, var z: UInt) {
     constructor(s: UInt) : this(s, s, s)
     constructor(xy: UVec2, z: UInt) : this(xy.x, xy.y, z)
     constructor(x: UInt, yz: UVec2) : this(x, yz.x, yz.y)
@@ -531,11 +531,11 @@ data class UVec3(val x: UInt, val y: UInt, val z: UInt) {
     override fun toString() = "($x, $y, $z)"
 
     companion object {
-        val Zero = UVec3(0u)
-        val One = UVec3(1u)
-        val UnitX = UVec3(1u, 0u, 0u)
-        val UnitY = UVec3(0u, 1u, 0u)
-        val UnitZ = UVec3(0u, 0u, 1u)
+        val Zero get() = UVec3(0u)
+        val One get() = UVec3(1u)
+        val UnitX get() = UVec3(1u, 0u, 0u)
+        val UnitY get() = UVec3(0u, 1u, 0u)
+        val UnitZ get() = UVec3(0u, 0u, 1u)
     }
 }
 /** A UVec3 from Ints, as their bits: `UVec3(1, 2, 3)`. */
@@ -546,7 +546,7 @@ operator fun UInt.times(v: UVec3) = UVec3(this * v.x, this * v.y, this * v.z)
 operator fun UInt.div(v: UVec3) = UVec3(this / v.x, this / v.y, this / v.z)
 
 /** kor::UVec4: 4 UInts, immutable. */
-data class UVec4(val x: UInt, val y: UInt, val z: UInt, val w: UInt) {
+data class UVec4(var x: UInt, var y: UInt, var z: UInt, var w: UInt) {
     constructor(s: UInt) : this(s, s, s, s)
     constructor(xyz: UVec3, w: UInt) : this(xyz.x, xyz.y, xyz.z, w)
     constructor(x: UInt, yzw: UVec3) : this(x, yzw.x, yzw.y, yzw.z)
@@ -588,12 +588,12 @@ data class UVec4(val x: UInt, val y: UInt, val z: UInt, val w: UInt) {
     override fun toString() = "($x, $y, $z, $w)"
 
     companion object {
-        val Zero = UVec4(0u)
-        val One = UVec4(1u)
-        val UnitX = UVec4(1u, 0u, 0u, 0u)
-        val UnitY = UVec4(0u, 1u, 0u, 0u)
-        val UnitZ = UVec4(0u, 0u, 1u, 0u)
-        val UnitW = UVec4(0u, 0u, 0u, 1u)
+        val Zero get() = UVec4(0u)
+        val One get() = UVec4(1u)
+        val UnitX get() = UVec4(1u, 0u, 0u, 0u)
+        val UnitY get() = UVec4(0u, 1u, 0u, 0u)
+        val UnitZ get() = UVec4(0u, 0u, 1u, 0u)
+        val UnitW get() = UVec4(0u, 0u, 0u, 1u)
     }
 }
 /** A UVec4 from Ints, as their bits: `UVec4(1, 2, 3, 4)`. */
@@ -604,7 +604,7 @@ operator fun UInt.times(v: UVec4) = UVec4(this * v.x, this * v.y, this * v.z, th
 operator fun UInt.div(v: UVec4) = UVec4(this / v.x, this / v.y, this / v.z, this / v.w)
 
 /** kor::BVec2: 2 Booleans, immutable. */
-data class BVec2(val x: Boolean, val y: Boolean) {
+data class BVec2(var x: Boolean, var y: Boolean) {
     constructor(s: Boolean) : this(s, s)
     /** The first 2 of a BVec3 (C++'s explicit conversion). */
     constructor(v: BVec3) : this(v.x, v.y)
@@ -627,7 +627,7 @@ data class BVec2(val x: Boolean, val y: Boolean) {
 }
 
 /** kor::BVec3: 3 Booleans, immutable. */
-data class BVec3(val x: Boolean, val y: Boolean, val z: Boolean) {
+data class BVec3(var x: Boolean, var y: Boolean, var z: Boolean) {
     constructor(s: Boolean) : this(s, s, s)
     constructor(xy: BVec2, z: Boolean) : this(xy.x, xy.y, z)
     constructor(x: Boolean, yz: BVec2) : this(x, yz.x, yz.y)
@@ -650,7 +650,7 @@ data class BVec3(val x: Boolean, val y: Boolean, val z: Boolean) {
 }
 
 /** kor::BVec4: 4 Booleans, immutable. */
-data class BVec4(val x: Boolean, val y: Boolean, val z: Boolean, val w: Boolean) {
+data class BVec4(var x: Boolean, var y: Boolean, var z: Boolean, var w: Boolean) {
     constructor(s: Boolean) : this(s, s, s, s)
     constructor(xyz: BVec3, w: Boolean) : this(xyz.x, xyz.y, xyz.z, w)
     constructor(x: Boolean, yzw: BVec3) : this(x, yzw.x, yzw.y, yzw.z)

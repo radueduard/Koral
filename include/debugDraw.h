@@ -10,7 +10,9 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <kmath/matrix.h>
@@ -21,7 +23,10 @@
 #include "frameGraph.h"
 #include "framebuffer.h"
 #include "graphicsPipeline.h"
+#include "image.h"
+#include "imageView.h"
 #include "resource.h"
+#include "sampler.h"
 
 namespace kor
 {
@@ -154,6 +159,28 @@ namespace kor
         /** @brief A cylinder from @p from to @p to with a half-sphere at each end. */
         void Capsule(kor::Vec3 from, kor::Vec3 to, float radius, const Style& style = {}, int segments = 24);
 
+        // ---- images -------------------------------------------------------------------------------
+
+        /**
+         * @brief An image on four corners in order around the edge: @p a its bottom left, @p b its bottom right,
+         *        @p c its top right and @p d its top left.
+         *
+         * Drawn before the fills and lines of its space, so that they lie over it: the world's in with what is
+         * opaque, one on top before the other shapes on top, one in a logic space before the rest of that space.
+         * A texel with no alpha leaves what is behind it; the rest are blended by their alpha. The style's fill, when
+         * it has one, tints it, and its outline is the quad's. An image is held by reference: one gone before it is
+         * drawn is left out. The barriers it needs are worked out, as for any draw — so one a pass of a frame graph
+         * writes after this one draws shows what it held the frame before.
+         *
+         * @param image A 2D image of one layer with Image::Usage::eSampled, of a format read as floats: not an integer one.
+         * @param sampler How it is read; linear, clamped to its edges, when not given. Nearest shows each texel.
+         */
+        void Image(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, kor::Vec3 d, const ResourceRef<const kor::Image>& image,
+                   const ResourceRef<const Sampler>& sampler = {}, const Style& style = {});
+        /** @brief An image through a 2D @p view of it: which level and layer, and how its channels are read. */
+        void Image(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, kor::Vec3 d, const ResourceRef<const ImageView>& view,
+                   const ResourceRef<const Sampler>& sampler = {}, const Style& style = {});
+
         // ---- cameras and lights -------------------------------------------------------------------
 
         /**
@@ -198,6 +225,16 @@ namespace kor
 
         /** @brief Everything being drawn, now. */
         void Clear();
+
+        /**
+         * @brief Until EndLogicSpace, shapes are given in a flat space @p size big, fixed to the view however the
+         *        camera moves, rather than in the world: (0, 0) at the bottom left, @p size at the top right, z
+         *        not used. Such shapes go over everything. A view of another shape holds all of the space, centred,
+         *        its units square; the last space begun is the one a view is fitted to. Only what is drawn between
+         *        the two is in it.
+         */
+        void BeginLogicSpace(kor::Vec2 size);
+        void EndLogicSpace();
         /**
          * @brief For a DebugDraw that is not a scene's own — a scene's is moved on by the application: the
          *        last frame is over, its lines go (those with time left keep it, less @p frameTime), and
@@ -206,6 +243,7 @@ namespace kor
         void NextFrame(float frameTime);
         [[nodiscard]] std::size_t LineCount() const { return _lines.size(); }
         [[nodiscard]] std::size_t TriangleCount() const { return _solidVertices.size() / 3; }
+        [[nodiscard]] std::size_t ImageCount() const { return _images.size(); }
 
         /**
          * @brief Draws the shapes into @p target, over what it holds: depth-tested against its depth
@@ -234,6 +272,7 @@ namespace kor
             float remaining;
             bool onTop;
             float width;
+            bool logic;     ///< In a logic space, not the world.
         };
         /** Triangles of one shape, at [first, first + count) of _solidVertices. */
         struct Solid {
@@ -242,6 +281,18 @@ namespace kor
             kor::Vec3 center;
             float remaining;
             bool onTop;
+            bool logic;     ///< In a logic space, not the world.
+        };
+        /** An image and where it goes: through its view when it has one. */
+        struct Picture {
+            ResourceRef<const kor::Image> image;
+            ResourceRef<const ImageView> view;
+            ResourceRef<const Sampler> sampler;
+            std::array<kor::Vec3, 4> corners;
+            kor::Vec4 tint;
+            float remaining;
+            bool onTop;
+            bool logic;     ///< In a logic space, not the world.
         };
         struct Vertex {
             kor::Vec4 position;
@@ -250,10 +301,21 @@ namespace kor
 
         /**
          * What is drawn, in the order it is drawn, each a range of the buffer and a pipeline. Wide lines
-         * are two vertices a line in the buffer, like the others, and six a line drawn: a quad.
+         * are two vertices a line in the buffer, like the others, and six a line drawn: a quad. An image
+         * is its four corners in the buffer, and six drawn.
          */
         enum Batch : std::uint8_t {
-            eOpaqueFills, eLines, eWideLines, eSeeThroughFills, eFillsOnTop, eLinesOnTop, eWideLinesOnTop, eBatchCount
+            eImages, eOpaqueFills, eLines, eWideLines, eSeeThroughFills,
+            eImagesOnTop, eFillsOnTop, eLinesOnTop, eWideLinesOnTop,
+            eLogicImages, eLogicFills, eLogicLines, eWideLogicLines, eBatchCount
+        };
+        /** A picture this frame draws: at @ref first of the buffer, in @ref batch. */
+        struct PictureDraw {
+            ResourceRef<const kor::Image> image;
+            ResourceRef<const ImageView> view;
+            ResourceRef<const Sampler> sampler;
+            std::uint32_t first;
+            Batch batch;
         };
         struct Target {
             std::array<Resource<GraphicsPipeline>, eBatchCount> pipelines;
@@ -269,6 +331,12 @@ namespace kor
         bool BeginFill(const Style& style);
         void FillTriangle(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c);
         void EndFill();
+        /** @p point as it is kept: the same in the world; in a logic space, from its middle, its height -1 to 1. */
+        [[nodiscard]] kor::Vec3 Kept(kor::Vec3 point) const;
+        void AddPicture(std::array<kor::Vec3, 4> corners, ResourceRef<const kor::Image> image, ResourceRef<const ImageView> view,
+                        const ResourceRef<const Sampler>& sampler, const Style& style);
+        /** Says why @p image is not drawn, once for each: an image drawn every frame says so once. */
+        void Refuse(const void* image, std::string_view why);
 
         struct GizmoDrag {
             std::uint64_t key;
@@ -288,7 +356,13 @@ namespace kor
         std::vector<Stored> _lines;
         std::vector<kor::Vec3> _solidVertices;
         std::vector<Solid> _solids;
+        std::vector<Picture> _images;
+        std::vector<PictureDraw> _pictureDraws;
+        std::set<const void*> _refused;
+        Resource<Sampler> _sampler;             ///< What an image is read with when it is not given one.
         std::optional<Solid> _filling;
+        std::optional<kor::Vec2> _logicSize;    ///< Between BeginLogicSpace and EndLogicSpace.
+        float _logicAspect = 1.f;               ///< Of the last space begun: what a view is fitted to.
         Resource<Buffer> _buffer;
         std::size_t _capacity = 0;          // in vertices
         std::array<std::uint32_t, eBatchCount> _counts {};

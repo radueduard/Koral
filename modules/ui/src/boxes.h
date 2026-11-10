@@ -224,12 +224,14 @@ namespace kui
 
     class RenderTranslate final : public RenderContainer {
     public:
-        void Set(kor::Vec2 by);
-        [[nodiscard]] kor::Vec2 ChildOrigin(const RenderObject& child) const override { return child.Offset() + _by; }
+        /** @p inside: moved back by as little as it takes for all of its child to be inside the room it was given. */
+        void Set(kor::Vec2 by, bool inside = false);
+        [[nodiscard]] kor::Vec2 ChildOrigin(const RenderObject& child) const override;
         /** Hit where its child is drawn, which may be outside its own box. */
         bool HitTest(HitTestResult& result, kor::Vec2 position) override;
     private:
         kor::Vec2 _by {};
+        bool _inside = false;
     };
 
     class RenderScroll final : public RenderContainer {

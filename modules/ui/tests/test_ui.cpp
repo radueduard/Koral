@@ -762,7 +762,7 @@ TEST_F(WidgetTest, ADragValueClickedIsTypedIn) {
     const auto press = [&](const kor::Key key) { input.FeedKey(key, true); settle(); input.FeedKey(key, false); settle(); };
     const auto show = [&] {
         Show(kui::Align(kui::Alignment::TopLeft(),
-                        kui::DragValue(value, [&](const float v) { value = v; }, kui::DragValueOptions {}.SetRange(0.f, 10.f).SetWidth(60.f))));
+                        kui::DragValue(value, [&](const double v) { value = static_cast<float>(v); }, kui::DragValueOptions {}.SetRange(0.f, 10.f).SetWidth(60.f))));
     };
     const auto typeIn = [&](const std::u32string& text) {
         Click({ 30.f, 15.f });
@@ -817,7 +817,7 @@ TEST_F(WidgetTest, ADragValueDraggedOrNotTypeableIsNoTextBox) {
     float value = 1.f;
     auto& input = scene->SceneInput();
     Show(kui::Align(kui::Alignment::TopLeft(),
-                    kui::DragValue(value, [&](const float v) { value = v; }, kui::DragValueOptions {}.SetSpeed(0.1f).SetWidth(60.f))));
+                    kui::DragValue(value, [&](const double v) { value = static_cast<float>(v); }, kui::DragValueOptions {}.SetSpeed(0.1f).SetWidth(60.f))));
     input.FeedMousePosition({ 30.f, 15.f });
     settle();
     input.FeedMouseButton(kor::MouseButton::eLeft, true);
@@ -831,7 +831,7 @@ TEST_F(WidgetTest, ADragValueDraggedOrNotTypeableIsNoTextBox) {
     EXPECT_FALSE(input.InterfaceWantsKeyboard()) << "a drag is no click";
 
     Show(kui::Align(kui::Alignment::TopLeft(),
-                    kui::DragValue(value, [&](const float v) { value = v; }, kui::DragValueOptions {}.SetWidth(60.f).SetTypeable(false))));
+                    kui::DragValue(value, [&](const double v) { value = static_cast<float>(v); }, kui::DragValueOptions {}.SetWidth(60.f).SetTypeable(false))));
     Click({ 30.f, 15.f });
     Click({ 30.f, 15.f });
     settle();
@@ -864,7 +864,7 @@ TEST(DragValueOptions, WrappingBringsAValueRoundIntoItsRangeAndClampingKeepsItAt
 TEST_F(WidgetTest, ADragValueThatWrapsComesBackInAtTheOtherEnd) {
     float value = 350.f;
     auto& input = scene->SceneInput();
-    Show(kui::Align(kui::Alignment::TopLeft(), kui::DragValue(value, [&](const float v) { value = v; },
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::DragValue(value, [&](const double v) { value = static_cast<float>(v); },
                     kui::DragValueOptions {}.SetSpeed(1.f).SetRange(0.f, 360.f).SetWrap(true).SetWidth(60.f))));
     input.FeedMousePosition({ 30.f, 15.f });
     settle();
@@ -888,8 +888,8 @@ TEST_F(WidgetTest, TabGoesThroughDragValuesTypingInEach) {
     const auto show = [&] {
         Show(kui::Align(kui::Alignment::TopLeft(), kui::Column({
             kui::TextField({ .onChanged = [&](const std::string& t) { name = t; }, .width = 60.f }),
-            kui::DragValue(first, [&](const float v) { first = v; }, kui::DragValueOptions {}.SetWidth(60.f)),
-            kui::DragValue(second, [&](const float v) { second = v; }, kui::DragValueOptions {}.SetWidth(60.f)),
+            kui::DragValue(first, [&](const double v) { first = static_cast<float>(v); }, kui::DragValueOptions {}.SetWidth(60.f)),
+            kui::DragValue(second, [&](const double v) { second = static_cast<float>(v); }, kui::DragValueOptions {}.SetWidth(60.f)),
             kui::DragValue(0.f, {}, kui::DragValueOptions {}.SetWidth(60.f).SetTypeable(false)),
         })));
     };
@@ -989,6 +989,17 @@ TEST_F(WidgetTest, APopupIsShownUnderWhatItIsInAndSaysWhenItGoes) {
     settle();
     EXPECT_EQ(dismissed, 1) << "a press outside it";
     EXPECT_TRUE(IsBlack(scene->At(5, 25)));
+}
+
+TEST_F(WidgetTest, APopupWiderThanTheRoomRightOfItsAnchorIsMovedInsideTheView) {
+    // At the right edge, a popup twice as wide as what it is in: from 44 it would go to 84 of a view 64 wide.
+    const auto dot = [](const kui::Color color, const float w, const float h) { return kui::SizedBox(w, h, kui::DecoratedBox({ .color = color }, {})); };
+    Show(kui::Align(kui::Alignment::TopRight(), kui::Stack({ dot(Red, 20.f, 20.f), kui::PopupAnchor(true, dot(Green, 40.f, 10.f), [] {}) })));
+    settle(); settle();
+    EXPECT_TRUE(IsGreen(scene->At(58, 25))) << "all of it inside, a few short of the edge";
+    EXPECT_TRUE(IsGreen(scene->At(22, 25))) << "moved left by as much as it was over";
+    EXPECT_TRUE(IsBlack(scene->At(62, 25)));
+    EXPECT_TRUE(IsBlack(scene->At(17, 25)));
 }
 
 TEST_F(WidgetTest, AScrollViewSaysWhereItIsAndGoesWhereItIsTold) {
@@ -1889,7 +1900,7 @@ TEST(DockMinWidth, APanelIsNoNarrowerThanItsContentNeedsAndItsDragsShareTheRest)
     kor::Vec2 view {}, x {}, y {}, z {};
     const auto drag = [](kor::Vec2& size, std::string label) {
         return kui::Expanded(kui::SizeObserver([&size](const kor::Vec2 s, kor::Vec2) { size = s; },
-                                               kui::DragValue(0.f, [](float) {}, kui::DragValueOptions {}.SetLabel(std::move(label)))));
+                                               kui::DragValue(0.f, [](double) {}, kui::DragValueOptions {}.SetLabel(std::move(label)))));
     };
     scene->ui.SetRoot(kui::DockSpace(layout, {
         { "scene", "Scene", kui::Make<Tapped>(nullptr, &view) },
@@ -3163,7 +3174,7 @@ namespace {
                                 .outputs = { { .id = "img", .label = "Image", .type = "image", .color = image, .shape = kui::PortShape::eDiamond } } });
             g.nodes.push_back({ .id = "count", .title = "Particles", .position = { 40.f, 200.f },
                                 .outputs = { { .id = "n", .label = "Count", .type = "number", .color = number } },
-                                .body = kui::DragValue(4096.f, [](float) {}, { .label = "n" }), .accent = kui::Color::Hex(0x5A8F3A) });
+                                .body = kui::DragValue(4096.f, [](double) {}, { .label = "n" }), .accent = kui::Color::Hex(0x5A8F3A) });
             g.nodes.push_back({ .id = "blur", .title = "Blur (compute)", .icon = "functions", .position = { 300.f, 60.f },
                                 .inputs = { { .id = "src", .label = "Source", .type = "image", .color = image, .shape = kui::PortShape::eDiamond },
                                             { .id = "radius", .label = "Radius", .type = "number", .color = number } },

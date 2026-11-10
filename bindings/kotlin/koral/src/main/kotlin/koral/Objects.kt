@@ -243,6 +243,25 @@ data class DebugStyle(val color: Vec4 = Vec4.One, val duration: Float = 0f, val 
         .floats("fill", *fill.toArray()).bool("fill_only", !outline).float("line_width", lineWidth).segment
 }
 
+/** The shapes of a [DebugDraw.logicSpace]: in two dimensions, as it is. */
+class DebugDraw2D internal constructor(private val debug: DebugDraw) {
+    private fun flat(point: Vec2) = Vec3(point, 0f)
+
+    fun line(from: Vec2, to: Vec2, style: DebugStyle? = null) = debug.line(flat(from), flat(to), style)
+    fun arrow(from: Vec2, to: Vec2, style: DebugStyle? = null) = debug.arrow(flat(from), flat(to), style)
+    fun point(position: Vec2, size: Float = 0.1f, style: DebugStyle? = null) = debug.point(flat(position), size, style)
+    fun rect(min: Vec2, max: Vec2, style: DebugStyle? = null) =
+        debug.quad(flat(min), Vec3(max.x, min.y, 0f), flat(max), Vec3(min.x, max.y, 0f), style)
+    fun circle(center: Vec2, radius: Float, style: DebugStyle? = null, segments: Int = 32) =
+        debug.circle(flat(center), Vec3(0f, 0f, 1f), radius, style, segments)
+    /** [image] between two corners, upright, behind what else the space draws. See [DebugDraw.image]. */
+    fun image(min: Vec2, max: Vec2, image: Image, sampler: Sampler? = null, style: DebugStyle? = null) =
+        debug.image(flat(min), Vec3(max.x, min.y, 0f), flat(max), Vec3(min.x, max.y, 0f), image, sampler, style)
+    /** [view] between two corners: which level and layer of an image. */
+    fun image(min: Vec2, max: Vec2, view: ImageView, sampler: Sampler? = null, style: DebugStyle? = null) =
+        debug.image(flat(min), Vec3(max.x, min.y, 0f), flat(max), Vec3(min.x, max.y, 0f), view, sampler, style)
+}
+
 /**
  * kor::GizmoPointer: the pointer a gizmo is used with, in the pixels of the image its camera draws — [position] null
  * when it is not over the image (or is something else's).
@@ -266,6 +285,21 @@ class DebugDraw internal constructor(internal val native: MemorySegment) {
     private fun Arena.v3(v: Vec3) = allocateFrom(ValueLayout.JAVA_FLOAT, v.x, v.y, v.z)
     private fun Arena.m4(m: Mat4) = allocateFrom(ValueLayout.JAVA_FLOAT, *m.toArray())
 
+    /**
+     * Draws [shapes] in a flat space [width] by [height], fixed to the view however the camera moves: (0, 0) at the
+     * bottom left, over everything. A view of another shape holds all of it, centred, its units square. Only what
+     * [shapes] draws is in it: the world is back when it returns.
+     *
+     *     debug.logicSpace(16f, 9f) {
+     *         rect(Vec2(1f, 1f), Vec2(15f, 8f))
+     *         circle(Vec2(8f, 4.5f), 0.5f)
+     *     }
+     */
+    fun logicSpace(width: Float, height: Float, shapes: DebugDraw2D.() -> Unit) {
+        KoralNative.koral_debug_begin_logic_space(native, width, height)
+        try { DebugDraw2D(this).shapes() } finally { KoralNative.koral_debug_end_logic_space(native) }
+    }
+
     fun line(from: Vec3, to: Vec3, style: DebugStyle? = null) = draw(style) { a, s -> KoralNative.koral_debug_line(native, a.v3(from), a.v3(to), s) }
     fun box(min: Vec3, max: Vec3, style: DebugStyle? = null) = draw(style) { a, s -> KoralNative.koral_debug_box(native, a.v3(min), a.v3(max), s) }
     fun box(transform: Mat4, style: DebugStyle? = null) = draw(style) { a, s -> KoralNative.koral_debug_box_transform(native, a.m4(transform), s) }
@@ -284,6 +318,17 @@ class DebugDraw internal constructor(internal val native: MemorySegment) {
         draw(style) { m, s -> KoralNative.koral_debug_quad(native, m.v3(a), m.v3(b), m.v3(c), m.v3(d), s) }
     fun plane(center: Vec3, normal: Vec3, size: Vec2, style: DebugStyle? = null) =
         draw(style) { m, s -> KoralNative.koral_debug_plane(native, m.v3(center), m.v3(normal), m.allocateFrom(ValueLayout.JAVA_FLOAT, size.x, size.y), s) }
+    /**
+     * An image on four corners in order around the edge: [a] its bottom left, [b] its bottom right, [c] its top right, [d]
+     * its top left. Behind the fills and lines of its space. It is a 2D image of one layer (a view says which, of one of
+     * several), with `eSampled` among its usage, of a format read as floats: not an integer one. [sampler] is linear and
+     * clamped when not given; `style.fill` tints it, and its outline is the quad's.
+     */
+    fun image(a: Vec3, b: Vec3, c: Vec3, d: Vec3, image: Image, sampler: Sampler? = null, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_image(native, m.v3(a), m.v3(b), m.v3(c), m.v3(d), image.native, sampler?.native ?: MemorySegment.NULL, s) }
+    /** An image through a 2D [view] of it: which level and layer, and how its channels are read. */
+    fun image(a: Vec3, b: Vec3, c: Vec3, d: Vec3, view: ImageView, sampler: Sampler? = null, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_image_view(native, m.v3(a), m.v3(b), m.v3(c), m.v3(d), view.native, sampler?.native ?: MemorySegment.NULL, s) }
     fun cylinder(from: Vec3, to: Vec3, radius: Float, style: DebugStyle? = null, segments: Int = 24) =
         draw(style) { m, s -> KoralNative.koral_debug_cylinder(native, m.v3(from), m.v3(to), radius, s, segments) }
     /** A cone with its base's centre at [base] and its point at [tip]. */
@@ -322,6 +367,7 @@ class DebugDraw internal constructor(internal val native: MemorySegment) {
     fun clear() = KoralNative.koral_debug_clear(native)
     val lineCount: Long get() = KoralNative.koral_debug_line_count(native)
     val triangleCount: Long get() = KoralNative.koral_debug_triangle_count(native)
+    val imageCount: Long get() = KoralNative.koral_debug_image_count(native)
 
     companion object {
         /** The debug lines a library built on Koral hands over, as a `KoralDebugDraw*`: an engine's scene's, for its scripts. */

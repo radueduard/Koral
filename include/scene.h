@@ -394,6 +394,8 @@ namespace kor
         struct KORAL_API Debug {
             using Style = kor::DebugDraw::Style;
             [[nodiscard]] static kor::DebugDraw& Get();
+            static void BeginLogicSpace(kor::Vec2 size);
+            static void EndLogicSpace();
             static void Line(kor::Vec3 from, kor::Vec3 to, const Style& style = {});
             static void Box(kor::Vec3 min, kor::Vec3 max, const Style& style = {});
             static void Box(const kor::Mat4& transform, const Style& style = {});
@@ -410,6 +412,10 @@ namespace kor
             static void Cylinder(kor::Vec3 from, kor::Vec3 to, float radius, const Style& style = {});
             static void Cone(kor::Vec3 base, kor::Vec3 tip, float radius, const Style& style = {});
             static void Capsule(kor::Vec3 from, kor::Vec3 to, float radius, const Style& style = {});
+            static void Image(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, kor::Vec3 d, const ResourceRef<const kor::Image>& image,
+                              const ResourceRef<const Sampler>& sampler = {}, const Style& style = {});
+            static void Image(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, kor::Vec3 d, const ResourceRef<const ImageView>& view,
+                              const ResourceRef<const Sampler>& sampler = {}, const Style& style = {});
             static void Camera(const kor::Mat4& view, const kor::Mat4& projection, float size = 1.f, const Style& style = {});
             static void PointLight(kor::Vec3 position, float range, const Style& style = {});
             static void SpotLight(kor::Vec3 position, kor::Vec3 direction, float range, float outerAngle, float innerAngle = 0.f,

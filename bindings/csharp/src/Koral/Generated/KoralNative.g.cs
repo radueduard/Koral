@@ -928,10 +928,15 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_debug_grid(IntPtr draw, float* center, float size, int cells, KoralDebugStyle* style);
     [LibraryImport(Library)] internal static partial void koral_debug_frustum(IntPtr draw, float* view_projection, KoralDebugStyle* style);
     [LibraryImport(Library)] internal static partial void koral_debug_clear(IntPtr draw);
+    [LibraryImport(Library)] internal static partial void koral_debug_begin_logic_space(IntPtr draw, float width, float height);
+    [LibraryImport(Library)] internal static partial void koral_debug_end_logic_space(IntPtr draw);
     [LibraryImport(Library)] internal static partial ulong koral_debug_line_count(IntPtr draw);
     [LibraryImport(Library)] internal static partial void koral_debug_triangle(IntPtr draw, float* a, float* b, float* c, KoralDebugStyle* style);
     [LibraryImport(Library)] internal static partial void koral_debug_quad(IntPtr draw, float* a, float* b, float* c, float* d, KoralDebugStyle* style);
     [LibraryImport(Library)] internal static partial void koral_debug_plane(IntPtr draw, float* center, float* normal, float* size, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_image(IntPtr draw, float* a, float* b, float* c, float* d, IntPtr image, IntPtr sampler, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_image_view(IntPtr draw, float* a, float* b, float* c, float* d, IntPtr view, IntPtr sampler, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial ulong koral_debug_image_count(IntPtr draw);
     [LibraryImport(Library)] internal static partial void koral_debug_cylinder(IntPtr draw, float* from, float* to, float radius, KoralDebugStyle* style, int segments);
     [LibraryImport(Library)] internal static partial void koral_debug_cone(IntPtr draw, float* @base, float* tip, float radius, KoralDebugStyle* style, int segments);
     [LibraryImport(Library)] internal static partial void koral_debug_capsule(IntPtr draw, float* from, float* to, float radius, KoralDebugStyle* style, int segments);

@@ -53,7 +53,8 @@ TEST(Math, VectorBasics) {
 }
 
 TEST(Math, Scalars) {
-    static_assert(Mod(-1.f, 3.f) == 2.f && Mod(-1, 3) == 2 && Mod(7, 3) == 1);
+    static_assert(Mod(-1, 3) == 2 && Mod(7, 3) == 1);
+    EXPECT_EQ(Mod(-1.f, 3.f), 2.f);
     static_assert(CeilPowerOfTwo(17u) == 32u && CeilPowerOfTwo(32u) == 32u && IsPowerOfTwo(64u));
     static_assert(AlignUp(13u, 8u) == 16u && DivideRoundUp(13, 8) == 2);
     static_assert(Remap(5.f, 0.f, 10.f, 100.f, 200.f) == 150.f);

@@ -503,7 +503,7 @@ namespace kor {
 
     public:
         /** @brief The GLFW callbacks every attached window is given. Internal. */
-        struct Callbacks {
+        struct KORAL_API Callbacks {
             static void KeyCallback(GLFWwindow*, int, int, int, int);
             static void MouseMoveCallback(GLFWwindow*, double, double);
             static void MouseButtonCallback(GLFWwindow*, int, int, int);

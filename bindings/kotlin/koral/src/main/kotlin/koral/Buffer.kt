@@ -92,6 +92,9 @@ internal fun bits(values: Array<out ImageUsage>) = values.fold(0) { acc, v -> ac
  *
  * uniforms.map { it.write(Camera(view, projection), packing = GpuPacking.Std140) }   // released at the end of the block
  * val back: List<Vertex> = vertices.readAs<Vertex>()
+ *
+ * val particles = buffer.asArray<Particle>(GpuPacking.Std430)        // kept for as long as the buffer is
+ * particles[i] = Particle(position, velocity)
  * ```
  *
  * Offsets and counts are in bytes, except where a function takes typed values: then they count those.
@@ -256,6 +259,44 @@ class Buffer internal constructor(native: MemorySegment) : Resource(native) {
             if (handle == MemorySegment.NULL) return
             KoralNative.koral_mapping_release(handle)
             handle = MemorySegment.NULL
+        }
+    }
+
+    /**
+     * This buffer as an array of values of [layout]: see [Elements]. By class, `buffer.asArray<Particle>()`.
+     * (`as`, the word a C# or C++ reader looks for, is Kotlin's own.)
+     */
+    fun <T> asArray(layout: GpuLayout<T>): Elements<T> = Elements(this, layout)
+
+    /**
+     * A buffer's values by index, `particles[i]` and `particles[i] = value`, for any buffer [read] and [write] take.
+     * Unlike [map], nothing is held open: it may be kept, and the buffer read, written and mapped meanwhile. Each index
+     * is a copy of its own, so what writes a whole buffer a frame is better as one [write]. A value is a copy: changing
+     * what `particles[i]` gave changes nothing until it is set back.
+     */
+    class Elements<T> internal constructor(val buffer: Buffer, val layout: GpuLayout<T>) {
+        private val stride = layout.stride
+        private val value: MemorySegment = Arena.ofAuto().allocate(maxOf(1L, stride), 16)
+
+        /** How many whole values the buffer holds. */
+        val count: Int get() = (buffer.size / stride).toInt()
+        val indices: IntRange get() = 0 until count
+
+        operator fun get(index: Int): T {
+            val reader = layout.read ?: throw KoralException("this GpuLayout cannot read")
+            checked(KoralNative.koral_buffer_read(buffer.native, value, stride, at(index)), "reading a buffer")
+            return reader(value, 0)
+        }
+
+        operator fun set(index: Int, element: T) {
+            val offset = at(index)
+            layout.write(value, 0, element)
+            checked(KoralNative.koral_buffer_write(buffer.native, value, stride, offset), "writing a buffer")
+        }
+
+        private fun at(index: Int): Long {
+            if (index !in indices) throw IndexOutOfBoundsException("index $index of a buffer of $count values")
+            return index * stride
         }
     }
 

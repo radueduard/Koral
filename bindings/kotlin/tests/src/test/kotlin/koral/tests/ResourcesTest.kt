@@ -32,6 +32,7 @@ import koral.HeapRole
 import koral.Image
 import koral.ImageFormat
 import koral.ImageUsage
+import koral.ImageView
 import koral.Input
 import koral.InputSource
 import koral.Key
@@ -57,7 +58,9 @@ import koral.Vec3
 import koral.Vec4
 import koral.VertexInputBindingDescription
 import koral.VertexLayout
+import koral.asArray
 import koral.launch
+import koral.setInstanceCount
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -119,6 +122,29 @@ class ResourcesTest {
         buffer.write(intArrayOf(100), offset = 4)
         assertEquals(100, buffer.readInts(1, offset = 1)[0])
         assertEquals(32, buffer.size)
+
+        // By index, with nothing held open: kept across a write of the buffer, and the mapping that follows.
+        val values = buffer.asArray<Int>()
+        assertEquals(8, values.count)
+        values[2] = 7
+        assertEquals(7, buffer.readInts(1, offset = 2)[0], "what an index wrote")
+        buffer.write(intArrayOf(11), offset = 12)
+        assertEquals(11, values[3], "and read")
+        buffer.map { it.write(intArrayOf(5)) }
+        assertEquals(5, values[0])
+        assertFailsWith<IndexOutOfBoundsException> { values[8] = 1 }
+
+        data class Particle(val position: Vec2, val life: Float, val id: Int)
+        val particles = Buffer.Builder().setInstanceCount<Particle>(2).setType(BufferType.eDynamic).build().asArray<Particle>()
+        particles[1] = Particle(Vec2(1f, 2f), 3f, 4)
+        assertEquals(Particle(Vec2(1f, 2f), 3f, 4), particles[1], "a struct, by its class")
+        assertEquals(2, particles.count)
+
+        // A texel of a picture: four bytes, the first its red.
+        data class Texel(val red: Byte, val green: Byte, val blue: Byte, val alpha: Byte)
+        val bytes = Buffer.Builder().setSize(8).setType(BufferType.eDynamic).build()
+        bytes.asArray<Texel>()[1] = Texel(-1, 0, 2, -1)
+        assertEquals(listOf<Byte>(-1, 0, 2, -1), bytes.read(4, offset = 4).toList(), "in the order they are written")
 
         val points = Buffer.Builder().setData(listOf(Vec2(1f, 2f), Vec2(3f, 4f)), GpuLayout.Vec2).setType(BufferType.eDynamic).build()
         assertEquals(listOf(Vec2(1f, 2f), Vec2(3f, 4f)), points.read(GpuLayout.Vec2), "values in and out by their layout")
@@ -383,7 +409,44 @@ class Lines : Scene() {
     }
 }
 
+/**
+ * An image closed after the debug pass recorded a draw of it, in the same frame: what a script's onDestroyed does when an
+ * editor's Stop, in a pass after that one, takes the script away. The frame's barriers are not worked out until it ends.
+ */
+class ImageClosedInItsFrame : Scene() {
+    var image: Image? = null
+    var closes = false
+    var closed = false
+    override fun initialize() {
+        graph.add(Clear(0f, 0f, 0f))
+        graph.add(DebugDrawPass(debug, { Mat4.Identity }))
+        graph.add(object : RenderPass("Close it") {
+            override fun setup(builder: PassBuilder) { builder.write(FrameGraph.Screen, ImageUsage.eColorAttachment) }
+            override fun record(commands: CommandBuffer) {
+                if (closes) { image?.close(); image = null; closes = false; closed = true }
+            }
+        })
+    }
+    override fun update() {
+        image?.let { debug.image(Vec3(-1f, -1f, 0.5f), Vec3(1f, -1f, 0.5f), Vec3(1f, 1f, 0.5f), Vec3(-1f, 1f, 0.5f), it) }
+    }
+}
+
 class DebugLinesTest {
+    @Test
+    fun anImageClosedInTheFrameThatDrewItStaysUntilTheFrameIsDone() = headlessApp().use { app ->
+        app.register<ImageClosedInItsFrame>()
+        val scene = app.openOffscreen("ImageClosedInItsFrame", OffscreenSettings(width = 32, height = 32)) as ImageClosedInItsFrame
+        app.frames(2)
+        scene.image = Image.Builder().setFormat(ImageFormat.eRGBA8_UNORM).setExtent(UVec2(2, 2))
+            .setUsage(ImageUsage.eSampled, ImageUsage.eTransferDst).build()
+        app.frames(2)
+        scene.closes = true
+        app.frames(3)
+        assertTrue(scene.closed, "it was closed in a frame")
+        assertEquals(0, scene.debug.imageCount, "and nothing is left of it")
+    }
+
     @Test
     fun debugLinesDraw() = headlessApp().use { app ->
         app.register<Lines>()
@@ -391,6 +454,31 @@ class DebugLinesTest {
         app.frames(4)
         assertTrue(scene.cameraCalls >= 3, "the camera was asked each frame (${scene.cameraCalls})")
         assertTrue(scene.debug.lineCount > 0, "the lines are there")
+    }
+
+    @Test
+    fun anImageIsDrawnAmongTheShapes() = headlessApp().use { app ->
+        app.register<Lines>()
+        val scene = app.openOffscreen("Lines", OffscreenSettings(width = 32, height = 32)) as Lines
+        val image = Image.Builder().setFormat(ImageFormat.eRGBA8_UNORM).setExtent(UVec2(2, 2))
+            .setUsage(ImageUsage.eSampled, ImageUsage.eTransferDst).build()
+        val layers = Image.Builder().setFormat(ImageFormat.eRGBA8_UNORM).setExtent(UVec2(2, 2)).setArrayLayers(2)
+            .setUsage(ImageUsage.eSampled, ImageUsage.eTransferDst).build()
+        val layer = ImageView.Builder(layers).setBaseArrayLayer(1).setArrayLayerCount(1).build()
+        val nearest = Sampler.Builder().setMinFilter(Filter.eNearest).setMagFilter(Filter.eNearest).build()
+        val debug = scene.debug
+        debug.clear()
+        debug.logicSpace(16f, 9f) {
+            image(Vec2(1f, 1f), Vec2(15f, 8f), image)
+            image(Vec2(1f, 1f), Vec2(15f, 8f), layer, nearest, DebugStyle(outline = false))
+            circle(Vec2(8f, 4.5f), 0.5f)
+        }
+        debug.image(Vec3(0f, 0f, 0f), Vec3(1f, 0f, 0f), Vec3(1f, 1f, 0f), Vec3(0f, 1f, 0f), image, style = DebugStyle(duration = 60f))
+        assertEquals(3, debug.imageCount)
+        debug.image(Vec3(0f, 0f, 0f), Vec3(1f, 0f, 0f), Vec3(1f, 1f, 0f), Vec3(0f, 1f, 0f), layers)
+        assertEquals(3, debug.imageCount, "an image of several layers says which, by a view")
+        app.frames(4)
+        assertEquals(1, debug.imageCount, "what has a duration stays; the rest were for their frame")
     }
 
     /** Filled shapes are triangles, and a gizmo dragged by a pointer of our own moves what it is on. */

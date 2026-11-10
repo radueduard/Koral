@@ -90,7 +90,8 @@ endif()
 # process per case (Koral.Tests runs each in its own); no display needed.
 if(KORAL_BUILD_DOTNET)
     add_custom_target(koral_dotnet_tests ALL
-            COMMAND "${KORAL_DOTNET_EXECUTABLE}" build "${KORAL_DOTNET_DIR}/tests/Koral.Tests" -c Release --nologo
+            COMMAND "${CMAKE_COMMAND}" -E env --unset=LIB   # as koral_dotnet
+                    "${KORAL_DOTNET_EXECUTABLE}" build "${KORAL_DOTNET_DIR}/tests/Koral.Tests" -c Release --nologo
                     -o "${KORAL_DOTNET_OUT}/tests"
             WORKING_DIRECTORY "${KORAL_DOTNET_DIR}"
             USES_TERMINAL

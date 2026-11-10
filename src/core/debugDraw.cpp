@@ -20,6 +20,7 @@
 #include "image.h"
 #include "imageView.h"
 #include "log.h"
+#include "sampler.h"
 #include "scene.h"
 #include "window.h"
 #include "shader.h"
@@ -78,15 +79,15 @@ namespace kor
     bool DebugDraw::BeginFill(const Style& style)
     {
         if (style.fill.w <= 0.f) return false;
-        _filling = Solid{static_cast<std::uint32_t>(_solidVertices.size()), 0, style.fill, {}, style.duration, style.onTop};
+        _filling = Solid{static_cast<std::uint32_t>(_solidVertices.size()), 0, style.fill, {}, style.duration, style.onTop, _logicSize.has_value()};
         return true;
     }
 
     void DebugDraw::FillTriangle(const kor::Vec3 a, const kor::Vec3 b, const kor::Vec3 c)
     {
-        _solidVertices.push_back(a);
-        _solidVertices.push_back(b);
-        _solidVertices.push_back(c);
+        _solidVertices.push_back(Kept(a));
+        _solidVertices.push_back(Kept(b));
+        _solidVertices.push_back(Kept(c));
     }
 
     void DebugDraw::EndFill()
@@ -111,7 +112,7 @@ namespace kor
 
     void DebugDraw::Line(const kor::Vec3 from, const kor::Vec3 to, const Style& style)
     {
-        _lines.push_back({from, to, style.color, style.duration, style.onTop, std::max(style.lineWidth, 1.f)});
+        _lines.push_back({Kept(from), Kept(to), style.color, style.duration, style.onTop, std::max(style.lineWidth, 1.f), _logicSize.has_value()});
         _changed = true;
     }
 
@@ -847,6 +848,43 @@ namespace kor
         return changed;
     }
 
+    // ---- images -------------------------------------------------------------------------------------
+
+    void DebugDraw::Refuse(const void* image, const std::string_view why)
+    {
+        if (_refused.insert(image).second) log::Error("[debug draw] an image is not drawn: {}", why);
+    }
+
+    void DebugDraw::AddPicture(const std::array<kor::Vec3, 4> corners, ResourceRef<const kor::Image> image, ResourceRef<const ImageView> view,
+                               const ResourceRef<const Sampler>& sampler, const Style& style)
+    {
+        const bool logic = _logicSize.has_value();
+        _images.push_back({std::move(image), std::move(view), sampler,
+                           {Kept(corners[0]), Kept(corners[1]), Kept(corners[2]), Kept(corners[3])},
+                           style.fill.w > 0.f ? style.fill : kor::Vec4(1.f), style.duration, style.onTop, logic});
+        _changed = true;
+        for (std::size_t i = 0; i < corners.size(); ++i) Edge(corners[i], corners[(i + 1) % corners.size()], style);
+    }
+
+    void DebugDraw::Image(const kor::Vec3 a, const kor::Vec3 b, const kor::Vec3 c, const kor::Vec3 d, const ResourceRef<const kor::Image>& image,
+                          const ResourceRef<const Sampler>& sampler, const Style& style)
+    {
+        if (!image.Valid()) return Refuse(nullptr, "there is no image");
+        if (image->ImageType() != kor::Image::Type::e2D) return Refuse(image.Get(), "it is not a 2D image");
+        if (image->ArrayLayers() > 1) return Refuse(image.Get(), "it has several layers: give a 2D view of the one to show");
+        if (!(image->UsageFlags() & kor::Image::Usage::eSampled)) return Refuse(image.Get(), "it needs eSampled among its usage");
+        AddPicture({a, b, c, d}, image, {}, sampler, style);
+    }
+
+    void DebugDraw::Image(const kor::Vec3 a, const kor::Vec3 b, const kor::Vec3 c, const kor::Vec3 d, const ResourceRef<const ImageView>& view,
+                          const ResourceRef<const Sampler>& sampler, const Style& style)
+    {
+        if (!view.Valid() || !view->SourceImage().Valid()) return Refuse(nullptr, "there is no image view");
+        if (view->ViewType() != ImageView::Type::e2D) return Refuse(view.Get(), "its view is not a 2D one");
+        if (!(view->SourceImage()->UsageFlags() & kor::Image::Usage::eSampled)) return Refuse(view.Get(), "it needs eSampled among its usage");
+        AddPicture({a, b, c, d}, {}, view, sampler, style);
+    }
+
     // ---- the frame --------------------------------------------------------------------------------
 
     void DebugDraw::Clear()
@@ -854,7 +892,23 @@ namespace kor
         _lines.clear();
         _solidVertices.clear();
         _solids.clear();
+        _images.clear();
         _changed = true;
+    }
+
+    void DebugDraw::BeginLogicSpace(const kor::Vec2 size)
+    {
+        _logicSize = kor::Vec2(std::max(size.x, 1e-6f), std::max(size.y, 1e-6f));
+        _logicAspect = _logicSize->x / _logicSize->y;
+    }
+
+    void DebugDraw::EndLogicSpace() { _logicSize.reset(); }
+
+    kor::Vec3 DebugDraw::Kept(const kor::Vec3 point) const
+    {
+        if (!_logicSize) return point;
+        const kor::Vec2 half = *_logicSize * 0.5f;
+        return {(point.x - half.x) / half.y, (point.y - half.y) / half.y, 0.f};
     }
 
     void DebugDraw::NextFrame(const float frameTime)
@@ -893,6 +947,10 @@ namespace kor
             return false;
         });
         _solidVertices = std::move(kept);
+        std::erase_if(_images, [&](Picture& picture) {
+            picture.remaining -= frameTime;
+            return picture.remaining <= 0.f;
+        });
         _changed = true;
     }
 
@@ -907,6 +965,21 @@ namespace kor
             if (const auto depth = target.DepthAttachment(); depth.Valid())
                 key += std::format("d{}", static_cast<int>(depth->SourceImage()->PixelFormat()));
             return key;
+        }
+
+        /** What draws an image binds the buffer and the picture by name, a set a draw: there is no set of it to make beforehand. */
+        constexpr bool drawsImages(const int batch, const int images, const int onTop, const int logic)
+        {
+            return batch == images || batch == onTop || batch == logic;
+        }
+
+        /** @p image is one of what @p target draws into: read while it is written, it would fail the whole pass. */
+        bool isTarget(const Framebuffer& target, const kor::Image* image)
+        {
+            for (kor::u32 i = 0; i < target.ColorAttachmentCount(); ++i)
+                if (target.ColorImage(i).Get() == image) return true;
+            const auto depth = target.DepthAttachment();
+            return depth.Valid() && depth->SourceImage().Get() == image;
         }
     }
 
@@ -927,9 +1000,9 @@ namespace kor
                 const kor::Vec4 clip = viewProjection * kor::Vec4(p, 1.f);
                 return perspective ? clip.w : clip.z;
             };
-            std::vector<std::pair<float, const Solid*>> opaque, seeThrough, onTop;
+            std::vector<std::pair<float, const Solid*>> opaque, seeThrough, onTop, inLogicSpace;
             for (const Solid& solid : _solids)
-                (solid.onTop ? onTop : solid.color.w >= 1.f ? opaque : seeThrough).emplace_back(depthOf(solid.center), &solid);
+                (solid.logic ? inLogicSpace : solid.onTop ? onTop : solid.color.w >= 1.f ? opaque : seeThrough).emplace_back(depthOf(solid.center), &solid);
             const auto farthestFirst = [](const auto& a, const auto& b) { return a.first > b.first; };
             std::ranges::stable_sort(seeThrough, farthestFirst);
             std::ranges::stable_sort(onTop, farthestFirst);
@@ -940,17 +1013,27 @@ namespace kor
                         vertices.push_back({kor::Vec4(_solidVertices[i], 1.f), solid->color});
             };
             // A wide line's width rides in its first end's w, which the wide-line shader reads it from.
-            const auto addLines = [&](const bool onTopLines, const bool wide) {
+            const auto addLines = [&](const bool onTopLines, const bool wide, const bool logic = false) {
                 for (const auto& line : _lines) {
-                    if (line.onTop != onTopLines || (line.width > 1.f) != wide) continue;
+                    if (line.logic != logic || (!logic && line.onTop != onTopLines) || (line.width > 1.f) != wide) continue;
                     vertices.push_back({kor::Vec4(line.from, wide ? line.width : 1.f), line.color});
                     vertices.push_back({kor::Vec4(line.to, 1.f), line.color});
                 }
             };
+            // An image's four corners, in order: which of a quad's it is, the shader knows by where it is in the six.
+            _pictureDraws.clear();
+            const auto addImages = [&](const Batch batch) {
+                for (const Picture& picture : _images) {
+                    if (batch != (picture.logic ? eLogicImages : picture.onTop ? eImagesOnTop : eImages)) continue;
+                    _pictureDraws.push_back({picture.image, picture.view, picture.sampler, static_cast<std::uint32_t>(vertices.size()), batch});
+                    for (const kor::Vec3 corner : picture.corners) vertices.push_back({kor::Vec4(corner, 1.f), picture.tint});
+                }
+            };
             const std::array<std::function<void()>, eBatchCount> batches {
-                [&] { addFills(opaque); }, [&] { addLines(false, false); }, [&] { addLines(false, true); },
-                [&] { addFills(seeThrough); }, [&] { addFills(onTop); }, [&] { addLines(true, false); },
-                [&] { addLines(true, true); }};
+                [&] { addImages(eImages); }, [&] { addFills(opaque); }, [&] { addLines(false, false); }, [&] { addLines(false, true); },
+                [&] { addFills(seeThrough); }, [&] { addImages(eImagesOnTop); }, [&] { addFills(onTop); }, [&] { addLines(true, false); },
+                [&] { addLines(true, true); }, [&] { addImages(eLogicImages); }, [&] { addFills(inLogicSpace); },
+                [&] { addLines(false, false, true); }, [&] { addLines(false, true, true); }};
             for (int batch = 0; batch < eBatchCount; ++batch) {
                 const std::size_t before = vertices.size();
                 batches[batch]();
@@ -971,6 +1054,8 @@ namespace kor
                 _buffer.SetName("debug shapes");
             }
             if (!vertices.empty() && _buffer.Valid()) _buffer->Write(std::span<const Vertex>(vertices), 0);
+            if (!_pictureDraws.empty() && !_sampler.Valid() && !_sampler.Poisoned())
+                _sampler = Sampler::Builder{}.SetAddressModeU(Sampler::AddressMode::eClampToEdge).SetAddressModeV(Sampler::AddressMode::eClampToEdge).Build();
         }
         if (!target.Valid() || !_buffer.Valid()) return;
 
@@ -981,11 +1066,13 @@ namespace kor
             const auto vertex = Shader::Builder{}.SetPath(ShaderPath("koralDebugLines.vert.glsl")).GetOrBuild();
             const auto wideVertex = Shader::Builder{}.SetPath(ShaderPath("koralDebugWideLines.vert.glsl")).GetOrBuild();
             const auto fragment = Shader::Builder{}.SetPath(ShaderPath("koralDebugLines.frag.glsl")).GetOrBuild();
+            const auto imageVertex = Shader::Builder{}.SetPath(ShaderPath("koralDebugImage.vert.glsl")).GetOrBuild();
+            const auto imageFragment = Shader::Builder{}.SetPath(ShaderPath("koralDebugImage.frag.glsl")).GetOrBuild();
             const bool hasDepth = target->DepthAttachment().Valid();
             ColorBlendState blend;
             blend.attachments.resize(target->ColorAttachmentCount(), ColorBlendState::AttachmentState{
                 .blendEnable = true, .srcColorBlendFactor = BlendFactor::eSrcAlpha, .dstColorBlendFactor = BlendFactor::eOneMinusSrcAlpha});
-            const auto make = [&](const bool triangles, const bool depthTest, const bool depthWrite, const bool wide = false) {
+            const auto make = [&](const bool triangles, const bool depthTest, const bool depthWrite, const bool wide = false, const bool image = false) {
                 RasterizationState rasterization;
                 // Fills pushed a little behind their own outlines, so the outline is not lost in them.
                 if (triangles && !wide) {
@@ -994,8 +1081,8 @@ namespace kor
                     rasterization.depthBiasSlopeFactor = 1.f;
                 }
                 return GraphicsPipeline::Builder()
-                    .SetVertexShader(wide ? wideVertex : vertex)
-                    .SetFragmentShader(fragment)
+                    .SetVertexShader(image ? imageVertex : wide ? wideVertex : vertex)
+                    .SetFragmentShader(image ? imageFragment : fragment)
                     .SetFramebuffer(target)
                     .SetInputAssemblyState({.topology = triangles || wide ? Topology::eTriangleList : Topology::eLineList})
                     .SetRasterizationState(rasterization)
@@ -1004,6 +1091,9 @@ namespace kor
                     .SetColorBlendState(blend)
                     .Build();
             };
+            entry.pipelines[eImages] = make(true, true, true, false, true);
+            entry.pipelines[eImagesOnTop] = make(true, false, false, false, true);
+            entry.pipelines[eLogicImages] = make(true, false, false, false, true);
             entry.pipelines[eOpaqueFills] = make(true, true, true);
             entry.pipelines[eLines] = make(false, true, false);
             entry.pipelines[eWideLines] = make(false, true, false, true);
@@ -1011,6 +1101,9 @@ namespace kor
             entry.pipelines[eFillsOnTop] = make(true, false, false);
             entry.pipelines[eLinesOnTop] = make(false, false, false);
             entry.pipelines[eWideLinesOnTop] = make(false, false, false, true);
+            entry.pipelines[eLogicFills] = make(true, false, false);
+            entry.pipelines[eLogicLines] = make(false, false, false);
+            entry.pipelines[eWideLogicLines] = make(false, false, false, true);
             for (const auto& pipeline : entry.pipelines)
                 if (!pipeline.Valid()) {
                     log::Error("[debug draw] a pipeline could not be made: {}",
@@ -1022,7 +1115,8 @@ namespace kor
         if (entry.buffer != _buffer.Get() && allValid) {
             entry.buffer = _buffer.Get();
             for (int batch = 0; batch < eBatchCount; ++batch)
-                entry.sets[batch] = DescriptorSet::Builder(ResourceRef<const GraphicsPipeline>(entry.pipelines[batch]), 0).Write(0, _buffer).Build();
+                if (!drawsImages(batch, eImages, eImagesOnTop, eLogicImages))
+                    entry.sets[batch] = DescriptorSet::Builder(ResourceRef<const GraphicsPipeline>(entry.pipelines[batch]), 0).Write(0, _buffer).Build();
         }
     }
 
@@ -1030,20 +1124,42 @@ namespace kor
     {
         if (std::ranges::all_of(_counts, [](const std::uint32_t c) { return c == 0; }) || !target.Valid()) return;
         const auto it = _targets.find(formatsOf(*target));
-        if (it == _targets.end() || !std::ranges::all_of(it->second.sets, [](const auto& s) { return s.Valid(); })) return;
+        if (it == _targets.end()) return;
         const auto& entry = it->second;
+        for (int batch = 0; batch < eBatchCount; ++batch)
+            if (!drawsImages(batch, eImages, eImagesOnTop, eLogicImages) && !entry.sets[batch].Valid()) return;
 
         commandBuffer.BeginRendering(RenderInfo(target)
             .SetColorLoadOperation(LoadOperation::eLoad)
             .SetDepthLoadOperation(LoadOperation::eLoad)
             .SetStencilLoadOperation(LoadOperation::eLoad));
         const kor::Vec2 viewport(target->Extent());
+        // A logic space is the view's and not the camera's: as tall as the view, or as wide when it is the wider.
+        const float aspect = viewport.x / std::max(viewport.y, 1.f), fit = std::min(aspect / _logicAspect, 1.f);
+        kor::Mat4 logicSpace(1.f);
+        logicSpace[0][0] = fit / aspect;
+        logicSpace[1][1] = -fit;
+        logicSpace[3][2] = 0.5f;
         std::uint32_t first = 0;
         for (int batch = 0; batch < eBatchCount; ++batch) {
             if (_counts[batch] > 0) {
-                commandBuffer.BindGraphicsPipeline(entry.pipelines[batch]).BindDescriptorSet(0, entry.sets[batch])
-                    .PushConstant("viewProjection", viewProjection);
-                if (batch == eWideLines || batch == eWideLinesOnTop) {
+                commandBuffer.BindGraphicsPipeline(entry.pipelines[batch]);
+                if (!drawsImages(batch, eImages, eImagesOnTop, eLogicImages)) commandBuffer.BindDescriptorSet(0, entry.sets[batch]);
+                commandBuffer.PushConstant("viewProjection", batch >= eLogicImages ? logicSpace : viewProjection);
+                if (drawsImages(batch, eImages, eImagesOnTop, eLogicImages)) {
+                    for (const PictureDraw& picture : _pictureDraws) {
+                        if (picture.batch != batch) continue;
+                        // Gone since it was asked for, or what is being drawn into: left out, and the rest drawn.
+                        const auto image = picture.view.Valid() ? picture.view->SourceImage() : picture.image;
+                        if (!image.Valid() || isTarget(*target, image.Get())) continue;
+                        const auto sampler = picture.sampler.Valid() ? picture.sampler : ResourceRef<const Sampler>(_sampler);
+                        if (!sampler.Valid()) continue;
+                        commandBuffer.Bind("Lines", ResourceRef<const Buffer>(_buffer));
+                        if (picture.view.Valid()) commandBuffer.Bind("picture", picture.view, sampler);
+                        else commandBuffer.Bind("picture", picture.image, sampler);
+                        commandBuffer.PushConstant("firstVertex", picture.first).Draw(6, 1, 0);
+                    }
+                } else if (batch == eWideLines || batch == eWideLinesOnTop || batch == eWideLogicLines) {
                     // Six vertices a line, made in the shader from the two it pulls from the buffer.
                     commandBuffer.PushConstant("viewport", viewport).PushConstant("firstVertex", first)
                         .Draw(_counts[batch] / 2 * 6, 1, 0);

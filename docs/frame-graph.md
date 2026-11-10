@@ -106,3 +106,7 @@ with the camera it is given — or into a view with that view's:
 Graph().Add<kor::DebugDrawPass>(SceneDebug(), [this] { return _camera->ViewProjection(); },
                                 std::string(kor::FrameGraph::Screen), "depth");   // tested against "depth"
 ```
+
+`Debug::Image` draws a picture among them, behind the fills and lines of its space: an image with `eSampled`, or a 2D
+view of one, and a sampler when linear and clamped is not what is wanted. The pass is not told of it, so nothing orders it
+after what writes the image: a writer scheduled later shows a frame later.

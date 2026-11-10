@@ -11,6 +11,7 @@
 #endif
 
 #include "capi.h"
+#include "capiInterop.h"
 
 #include "app.h"
 #include "context.h"
@@ -731,6 +732,11 @@ void koral_debug_frustum(KoralDebugDraw* d, const float viewProjection[16], cons
     GuardedVoid([&] { DebugOf(d).Frustum(Mat4Of(viewProjection), StyleOf(s)); });
 }
 void koral_debug_clear(KoralDebugDraw* d) { GuardedVoid([&] { DebugOf(d).Clear(); }); }
+void koral_debug_begin_logic_space(KoralDebugDraw* d, const float width, const float height)
+{
+    GuardedVoid([&] { DebugOf(d).BeginLogicSpace({width, height}); });
+}
+void koral_debug_end_logic_space(KoralDebugDraw* d) { GuardedVoid([&] { DebugOf(d).EndLogicSpace(); }); }
 uint64_t koral_debug_line_count(KoralDebugDraw* d) { return Guarded([&] { return static_cast<uint64_t>(DebugOf(d).LineCount()); }, uint64_t{0}); }
 void koral_debug_triangle(KoralDebugDraw* d, const float a[3], const float b[3], const float c[3], const KoralDebugStyle* s)
 {
@@ -744,6 +750,17 @@ void koral_debug_plane(KoralDebugDraw* d, const float center[3], const float nor
 {
     GuardedVoid([&] { DebugOf(d).Plane(Vec3Of(center), Vec3Of(normal), {size[0], size[1]}, StyleOf(s)); });
 }
+void koral_debug_image(KoralDebugDraw* d, const float a[3], const float b[3], const float c[3], const float e[3], KoralImage* image,
+                       KoralSampler* sampler, const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).Image(Vec3Of(a), Vec3Of(b), Vec3Of(c), Vec3Of(e), ImageOf(image), sampler ? SamplerOf(sampler) : ResourceRef<const Sampler>{}, StyleOf(s)); });
+}
+void koral_debug_image_view(KoralDebugDraw* d, const float a[3], const float b[3], const float c[3], const float e[3], KoralImageView* view,
+                            KoralSampler* sampler, const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).Image(Vec3Of(a), Vec3Of(b), Vec3Of(c), Vec3Of(e), ImageViewOf(view), sampler ? SamplerOf(sampler) : ResourceRef<const Sampler>{}, StyleOf(s)); });
+}
+uint64_t koral_debug_image_count(KoralDebugDraw* d) { return Guarded([&] { return static_cast<uint64_t>(DebugOf(d).ImageCount()); }, uint64_t{0}); }
 void koral_debug_cylinder(KoralDebugDraw* d, const float from[3], const float to[3], const float radius, const KoralDebugStyle* s, const int segments)
 {
     GuardedVoid([&] { DebugOf(d).Cylinder(Vec3Of(from), Vec3Of(to), radius, StyleOf(s), segments > 0 ? segments : 24); });

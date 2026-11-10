@@ -184,6 +184,13 @@ namespace
         if (!o) return {};
         return [o, f = a.invoke](const float v) { f(v, o->user); };
     }
+    /// F for a DragValue, which gives doubles: the C API's numbers are floats.
+    std::function<void(double)> FDouble(const KuiFloatAction& a)
+    {
+        auto o = Hold(a);
+        if (!o) return {};
+        return [o, f = a.invoke](const double v) { f(static_cast<float>(v), o->user); };
+    }
     std::function<void(kor::Vec2)> F(const KuiPointAction& a)
     {
         auto o = Hold(a);
@@ -895,12 +902,12 @@ KuiWidget* kui_progress_bar(const float value) { KUI_WIDGET(ProgressBar(value));
 KuiWidget* kui_drag_value(const float value, const KuiFloatAction onChanged, const float speed, const float min, const float max,
                           const int32_t decimals, const char* label, const float width, const bool typeable, const bool wrap)
 {
-    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eHorizontal, typeable, wrap }));
+    KUI_WIDGET(DragValue(value, FDouble(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eHorizontal, typeable, wrap }));
 }
 KuiWidget* kui_drag_value_vertical(const float value, const KuiFloatAction onChanged, const float speed, const float min, const float max,
                                    const int32_t decimals, const char* label, const float width, const bool typeable, const bool wrap)
 {
-    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eVertical, typeable, wrap }));
+    KUI_WIDGET(DragValue(value, FDouble(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eVertical, typeable, wrap }));
 }
 KuiWidget* kui_slider_vertical(const float value, const KuiFloatAction onChanged, const float min, const float max, const KuiAction onFinished)
 {

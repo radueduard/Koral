@@ -105,7 +105,7 @@ namespace kgui
             {
                 auto options = kui::DragValueOptions {}.SetSpeed(whole ? 0.2f : 0.01f).SetDecimals(whole ? 0 : 3);
                 if (field && field->min && field->max) options.SetRange(static_cast<float>(*field->min), static_cast<float>(*field->max));
-                return Labeled(label, kui::DragValue(static_cast<float>(*static_cast<T*>(address)), [this, get, whole](const float v) {
+                return Labeled(label, kui::DragValue(static_cast<float>(*static_cast<T*>(address)), [this, get, whole](const double v) {
                     if (T* target = At<T>(get)) *target = static_cast<T>(whole ? std::round(v) : v);
                     Changed();
                 }, options));
@@ -209,7 +209,7 @@ namespace kgui
                 case TypeKind::eEnum: {
                     const auto current = type.enumRead(address);
                     if (type.enumerators.empty()) {
-                        editor = Labeled(label, kui::DragValue(static_cast<float>(current), [this, &type, get](const float v) {
+                        editor = Labeled(label, kui::DragValue(static_cast<float>(current), [this, &type, get](const double v) {
                             if (const kor::Ref ref = get(); ref.Valid()) type.enumWrite(ref.Address(), static_cast<std::int64_t>(std::round(v)));
                             Changed();
                         }, kui::DragValueOptions {}.SetDecimals(0).SetSpeed(0.2f)));

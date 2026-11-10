@@ -26,7 +26,7 @@ namespace kor {
     /// v - Floor(v): in [0, 1), negative v included.
     template<std::floating_point T> T Fract(T v) { return v - std::floor(v); }
     /// GLSL's mod: v - m * floor(v / m), the sign of m (std::fmod would keep v's).
-    template<std::floating_point T> constexpr T Mod(T v, T m) { return v - m * std::floor(v / m); }
+    template<std::floating_point T> T Mod(T v, T m) { return v - m * std::floor(v / m); }
     /// Mod for integers: never negative for a positive m.
     template<std::integral T> constexpr T Mod(T v, T m) {
         T r = v % m;

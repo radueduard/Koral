@@ -147,11 +147,19 @@ internal object AutoLayouts {
                 Resource::class.java.isAssignableFrom(type) ->
                     throw IllegalArgumentException("${type.simpleName}: a resource has no bytes of its own. A push constant takes it (pushConstantBlock and pushConstant push the struct by its fields' names); in a buffer, store Bindless.sampled(...)/storage(...)/... instead")
                 type.isEnum -> enumLayout(type)
+                type in SizedVectorShapes -> sizedVector(type, std)
                 type.isArray || Collection::class.java.isAssignableFrom(type) ->
                     throw IllegalArgumentException("${type.simpleName}: an array or list inside a struct has no fixed size in GPU memory; use separate fields, or a buffer of its own")
                 else -> struct(type, packing)
             }
         }
+    }
+
+    /** A U8Vec4 and the like: a component's alignment as it is in C; two components', or four, in a shader's block. */
+    private fun sizedVector(type: Class<*>, std: Boolean): GpuLayout<Any> {
+        val plain = struct(type, GpuPacking.C)
+        val (bytes, count) = SizedVectorShapes.getValue(type)
+        return if (!std) plain else GpuLayout(plain.size, plain.write, plain.read, bytes * (if (count == 2) 2 else 4))
     }
 
     /** An enum as 4 bytes: its `value` (Koral's enums carry the C++ one) or else its ordinal. */
@@ -219,6 +227,9 @@ inline fun <reified T : Any> Buffer.Builder.setInstanceCount(count: Long, packin
 /** [count] values of [T] (laid out with [packing]) from the [offset]th (-1: the rest). */
 inline fun <reified T : Any> Buffer.readAs(count: Int = -1, offset: Long = 0, packing: GpuPacking = GpuPacking.C): List<T> =
     read(GpuLayout.of(T::class, packing), count, offset)
+
+/** The buffer as an array of [T] laid out with [packing], `buffer.asArray<Particle>()[i] = particle`: see [Buffer.Elements]. */
+inline fun <reified T : Any> Buffer.asArray(packing: GpuPacking = GpuPacking.C): Buffer.Elements<T> = asArray(GpuLayout.of(T::class, packing))
 
 /** [Buffer.readAsync], as values of [T]. */
 suspend inline fun <reified T : Any> Buffer.readAsyncAs(count: Int = -1, offset: Long = 0, packing: GpuPacking = GpuPacking.C): List<T> =

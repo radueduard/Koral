@@ -3,13 +3,22 @@
 //
 
 #include <cstring>
+#include <mutex>
 #include <ranges>
 #include <span>
+#include <vector>
 
 #include "capi.h"
 #include "capiInterop.h"
 
 #include "token.h"
+
+namespace kor::capi
+{
+    bool HeldForTheFrame(KoralResource* resource);
+    void HoldReleases();
+    void ReleaseHeld();
+}
 
 namespace kor::capi
 {
@@ -181,7 +190,13 @@ const char* koral_error_describe(const uint32_t code) { return Keep(std::string(
 
 // ---- resources -------------------------------------------------------------------------------------------
 
-void koral_resource_release(KoralResource* resource) { GuardedVoid([&] { delete resource; }); }
+void koral_resource_release(KoralResource* resource)
+{
+    GuardedVoid([&] {
+        if (resource && resource->Owned() && HeldForTheFrame(resource)) return;
+        delete resource;
+    });
+}
 KoralResource* koral_resource_borrow(KoralResource* resource) { return resource ? resource->Borrow() : nullptr; }
 KoralResourceKind koral_resource_kind(KoralResource* resource) { return resource ? resource->Kind() : static_cast<KoralResourceKind>(0); }
 bool koral_resource_owned(KoralResource* resource) { return resource && resource->Owned(); }
@@ -1183,6 +1198,42 @@ void koral_token_signal(KoralToken* token) { if (token) GuardedVoid([&] { token-
 uint64_t koral_token_value(KoralToken* token) { return token ? token->token.Value() : 0; }
 
 } // extern "C"
+
+// ---- what is released while a frame records --------------------------------------------------------------
+//
+// What a frame has recorded is emitted when it ends, and barriers are worked out then: what a script closes in that frame
+// — an editor's Stop, in a pass after the one that drew with it — is named by commands still to run, and some of what
+// names it (an image's own views) cannot tell that it has gone. So it goes when the frame has.
+namespace
+{
+    bool holding = false;
+    std::mutex heldLock;
+    std::vector<KoralResource*> held;
+}
+
+bool kor::capi::HeldForTheFrame(KoralResource* resource)
+{
+    const std::lock_guard lock(heldLock);
+    if (holding) held.push_back(resource);
+    return holding;
+}
+
+void kor::capi::HoldReleases()
+{
+    const std::lock_guard lock(heldLock);
+    holding = true;
+}
+
+void kor::capi::ReleaseHeld()
+{
+    std::vector<KoralResource*> released;
+    {
+        const std::lock_guard lock(heldLock);
+        holding = false;
+        released.swap(held);
+    }
+    for (auto* resource : released) delete resource;
+}
 
 // ---- for modules' C interfaces (C++ linkage) --------------------------------------------------------------
 kor::ResourceRef<const kor::Image> kor::capi::ImageOf(KoralResource* handle) { return RefOf<Image>(handle); }

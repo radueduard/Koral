@@ -60,6 +60,8 @@ include(GNUInstallDirs)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# No C++20 modules here; the scan would only cost time, and MSBuild warns (MSB8074) when it cannot read its output.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
@@ -1171,7 +1173,9 @@ if(KORAL_BUILD_DOTNET)
     set(KORAL_DOTNET_DIR "${CMAKE_SOURCE_DIR}/bindings/csharp")
     set(KORAL_DOTNET_OUT "${CMAKE_BINARY_DIR}/dotnet")
     add_custom_target(koral_dotnet ALL
-            COMMAND "${KORAL_DOTNET_EXECUTABLE}" publish "${KORAL_DOTNET_DIR}/src/Koral.Runner" -c Release --nologo
+            # LIB is the C++ build's, and names directories csc warns about (CS1668). C# has no use for it.
+            COMMAND "${CMAKE_COMMAND}" -E env --unset=LIB
+                    "${KORAL_DOTNET_EXECUTABLE}" publish "${KORAL_DOTNET_DIR}/src/Koral.Runner" -c Release --nologo
                     -o "${KORAL_DOTNET_OUT}/koral-dotnet"
             WORKING_DIRECTORY "${KORAL_DOTNET_DIR}"
             USES_TERMINAL

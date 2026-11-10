@@ -241,6 +241,9 @@ val mesh = Buffer.Builder().setData(vertices).setUsage(BufferUsage.eVertex).buil
 val particles = Buffer.Builder().setData(list, GpuPacking.Std430)...                     // a shader's storage block
 uniforms.map { it.write(Camera(viewProjection, eye), packing = GpuPacking.Std140) }
 val back: List<Vertex> = mesh.readAs<Vertex>()
+
+val particles = buffer.asArray<Particle>(GpuPacking.Std430)     // by index, nothing held open: `as` is Kotlin's own word
+particles[i] = Particle(position, velocity)
 ```
 
 `GpuPacking.C`, the default, gives the same bytes as the same struct in C++ and C# (a `Vec3` is 12 bytes, aligned

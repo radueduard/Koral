@@ -45,7 +45,7 @@ class Image internal constructor(native: MemorySegment) : Resource(native) {
         fun setUsage(vararg usage: ImageUsage) = apply { KoralNative.koral_image_builder_set_usage(native, bits(usage)) }
         /**
          * Its pixels, copied now (and the transfer usages added, as in C++): a primitive array, a MemorySegment, or
-         * anything else [Buffer.Builder.setData] takes — a list of U8Vec4-like data classes, of Vec4s for a float format.
+         * anything else [Buffer.Builder.setData] takes — a list of U8Vec4s, of Vec4s for a float format.
          */
         fun setData(pixels: Any) = apply {
             Arena.ofConfined().use { a ->

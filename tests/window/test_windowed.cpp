@@ -13,7 +13,11 @@
 
 #include <gtest/gtest.h>
 
-#include <dlfcn.h>
+#if defined(_WIN32)
+#  include <windows.h>
+#else
+#  include <dlfcn.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -58,6 +62,8 @@
 // The GUI extras module, in a real scene's koral-ui interface.
 #include <koralGuiExtras.h>
 #include <kui/render.h>
+
+#undef LoadLibrary   // App::LoadLibrary, not Win32's
 
 namespace {
 
@@ -1947,6 +1953,20 @@ TEST_F(VkWindowTest, ASceneLibraryIsLoadedOpenedReloadedAndUnloaded) {
     auto& app = VkEnvironment::app();
     const std::filesystem::path library = KORAL_TEST_SCENE_LIBRARY;
     const auto alive = [&] {
+#if defined(_WIN32)
+        // What is loaded is a copy, in a directory of this process' own (see openLibrary in app.cpp).
+        // GetModuleHandle takes no reference, so looking cannot keep it loaded.
+        std::error_code ec;
+        const auto copies = std::filesystem::temp_directory_path(ec) / "koral-libraries" / std::to_string(GetCurrentProcessId());
+        for (const auto& entry : std::filesystem::directory_iterator(copies, ec)) {
+            if (!entry.path().stem().string().starts_with(library.stem().string())) continue;
+            const HMODULE handle = GetModuleHandleW(entry.path().c_str());
+            if (!handle) continue;
+            const auto count = reinterpret_cast<int (*)()>(GetProcAddress(handle, "KoralTestScenesAlive"));
+            return count ? count() : -1;
+        }
+        return -1;
+#else
         // A second handle to the loaded library, released at once so it cannot keep it loaded.
         void* handle = dlopen(library.c_str(), RTLD_NOW | RTLD_NOLOAD);
         if (!handle) return -1;
@@ -1954,6 +1974,7 @@ TEST_F(VkWindowTest, ASceneLibraryIsLoadedOpenedReloadedAndUnloaded) {
         const int result = count ? count() : -1;
         dlclose(handle);
         return result;
+#endif
     };
 
     const auto names = app.LoadLibrary(library);

@@ -102,7 +102,7 @@ namespace kgui
                     [&camera](const std::vector<float>& v) { camera.SetPosition({v[0], v[1], v[2]}); }, 0.1f)));
                 if constexpr (perspective) {
                     rows.push_back(Labeled("fov", kui::DragValue(kor::Degrees(camera.FovY()),
-                        [&camera](const float degrees) { camera.SetFovY(kor::Radians(degrees)); },
+                        [&camera](const double degrees) { camera.SetFovY(kor::Radians(static_cast<float>(degrees))); },
                         kui::DragValueOptions {}.SetRange(10.f, 140.f).SetDecimals(0).SetSpeed(0.5f))));
                     Aspect(camera, rows);
                     rows.push_back(Labeled("near / far", DragFloats({camera.ZNear(), camera.ZFar()}, [&camera](const std::vector<float>& v) {
@@ -142,7 +142,7 @@ namespace kgui
                     rows.push_back(kui::Checkbox(camera.FollowsWindowAspect(),
                         [&camera](const bool follows) { camera.SetFollowWindowAspect(follows); }, "follow window aspect"));
                 }
-                rows.push_back(kui::Disabled(Labeled("aspect", kui::DragValue(camera.Aspect(), [&camera](const float a) { camera.SetAspect(a); },
+                rows.push_back(kui::Disabled(Labeled("aspect", kui::DragValue(camera.Aspect(), [&camera](const double a) { camera.SetAspect(static_cast<float>(a)); },
                     kui::DragValueOptions {}.SetRange(0.1f, 10.f).SetDecimals(3))), source != Kind::eNone));
             }
 
@@ -164,10 +164,10 @@ namespace kgui
                     edit([](kcam::Controller& c, const int kind) { c.kind = static_cast<kcam::Controller::Kind>(kind); }))));
 
                 if (controller.kind == kcam::Controller::Kind::eFly) {
-                    rows.push_back(Labeled("speed", kui::DragValue(controller.speed, edit([](kcam::Controller& c, const float v) { c.speed = v; }),
+                    rows.push_back(Labeled("speed", kui::DragValue(controller.speed, edit([](kcam::Controller& c, const double v) { c.speed = static_cast<float>(v); }),
                         kui::DragValueOptions {}.SetRange(0.1f, 100.f).SetDecimals(1).SetSpeed(0.1f))));
                     rows.push_back(Labeled("boost", kui::DragValue(controller.bindings.boostFactor,
-                        edit([](kcam::Controller& c, const float v) { c.bindings.boostFactor = v; }),
+                        edit([](kcam::Controller& c, const double v) { c.bindings.boostFactor = static_cast<float>(v); }),
                         kui::DragValueOptions {}.SetRange(1.f, 20.f).SetDecimals(1).SetSpeed(0.1f))));
                 }
                 if (controller.kind == kcam::Controller::Kind::eOrbit) {
@@ -323,7 +323,7 @@ namespace kgui
                 }, {
                     Labeled("source", kui::Dropdown({"none", "mouse X", "mouse Y", "scroll X", "scroll Y"}, static_cast<int>(axis.source),
                         edit([](kcam::Axis& a, const int source) { a.source = static_cast<kcam::AxisSource>(source); }))),
-                    Labeled("sensitivity", kui::DragValue(axis.sensitivity, edit([](kcam::Axis& a, const float v) { a.sensitivity = v; }),
+                    Labeled("sensitivity", kui::DragValue(axis.sensitivity, edit([](kcam::Axis& a, const double v) { a.sensitivity = static_cast<float>(v); }),
                         kui::DragValueOptions {}.SetRange(0.f, 10.f).SetDecimals(4).SetSpeed(speed))),
                     kui::Checkbox(axis.invert, edit([](kcam::Axis& a, const bool v) { a.invert = v; }), "invert"),
                 });

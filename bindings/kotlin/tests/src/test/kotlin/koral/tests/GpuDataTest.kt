@@ -22,6 +22,25 @@ class Unsized(val values: List<Float>)
 
 class GpuDataTest {
     @Test
+    fun sizedVectorsAreLaidOutAsTheyAreInCppAndInAShader() {
+        assertEquals(4L, gpuLayout<U8Vec4>().stride)
+        assertEquals(3L, gpuLayout<U8Vec3>().size)
+        assertEquals(1L, gpuLayout<U8Vec3>().alignment, "aligned as a byte, as in C++")
+        assertEquals(32L, gpuLayout<I64Vec4>().stride)
+        assertEquals(8L, gpuLayout<U64Vec3>().alignment)
+        assertEquals(4L, gpuLayout<U8Vec3>(GpuPacking.Std430).stride, "a shader's: a vec3 steps as a vec4")
+        assertEquals(32L, gpuLayout<I64Vec4>(GpuPacking.Std430).alignment)
+        assertEquals(4L, gpuLayout<U16Vec2>(GpuPacking.Std430).alignment)
+
+        data class Vertex(val position: Vec2, val color: U8Vec4)
+        assertEquals(12L, gpuLayout<Vertex>().stride, "in a struct")
+        val vertex = Vertex(Vec2(1f, 2f), U8Vec4(255, 1, 2, 3))
+        assertEquals(listOf(vertex), fromGpuBytes<Vertex>(gpuBytes(listOf(vertex))), "and back")
+        assertEquals(listOf<Byte>(-1, 1, 2, 3), gpuBytes(U8Vec4(255, 1, 2, 3)).toList(), "in order, red first")
+        assertEquals(listOf(U8Vec4(9), U8Vec4(255, 0, 0, 1)), fromGpuBytes<U8Vec4>(gpuBytes(listOf(U8Vec4(9), U8Vec4(255, 0, 0, 1)))))
+    }
+
+    @Test
     fun layoutsAreCppsAndTheShaders() {
         // C packing: the same bytes as the same C++ struct (kor::Vec3 is 12 bytes, aligned to 4).
         assertEquals(24, gpuLayout<Vertex>().size)

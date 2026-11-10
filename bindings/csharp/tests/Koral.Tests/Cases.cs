@@ -228,6 +228,18 @@ public static partial class Cases
         buffer.WriteAt(1, 100);
         Check.Equal(100, buffer.ReadAt<int>(1), "WriteAt and ReadAt");
         Check.Equal(32ul, buffer.Size, "its size, in bytes");
+
+        // By index, with nothing held open: kept across a write of the buffer, and the mapping that follows.
+        var values = buffer.As<int>();
+        Check.Equal(8, values.Count, "as many as it holds");
+        values[2] = 7;
+        Check.Equal(7, buffer.ReadAt<int>(2), "what an index wrote");
+        buffer.WriteAt(3, 11);
+        Check.Equal(11, values[3], "and read");
+        using (var mapping = buffer.Map<int>()) mapping[0] = 5;
+        Check.Equal(5, values[0], "after a mapping");
+        buffer.As<int>()[1] = 9;
+        Check.Equal(9, buffer.ReadAt<int>(1), "on one line");
     }
 
     private const string ComputeShader = """
@@ -519,6 +531,50 @@ public static partial class Cases
         app.Frame();
         for (var i = 0; i < 10 && Lines.Camera!.IsAlive; ++i) { GC.Collect(); GC.WaitForPendingFinalizers(); }
         Check.That(!Lines.Camera!.IsAlive, "and let go of when the scene closed");
+    }
+
+    /// <summary>An image among the shapes, in the world and in a logic space, through a view of it and a sampler.</summary>
+    public static void AnImageIsDrawnAmongTheShapes()
+    {
+        using var app = Check.HeadlessApp();
+        app.Register<Lines>();
+        var scene = app.OpenOffscreen("Lines", Offscreen(32));
+        using var image = new Image.Builder().SetFormat(Image.Format.eRGBA8_UNORM).SetExtent(new UVec2(2, 2))
+            .SetUsage(Image.Usage.eSampled | Image.Usage.eTransferDst).Build();
+        using var layers = new Image.Builder().SetFormat(Image.Format.eRGBA8_UNORM).SetExtent(new UVec2(2, 2)).SetArrayLayers(2)
+            .SetUsage(Image.Usage.eSampled | Image.Usage.eTransferDst).Build();
+        using var layer = new ImageView.Builder(layers).SetBaseArrayLayer(1).SetArrayLayerCount(1).Build();
+        using var nearest = new Sampler.Builder().SetMinFilter(Filter.eNearest).SetMagFilter(Filter.eNearest).Build();
+        var debug = scene.SceneDebug;
+        debug.Clear();
+        debug.LogicSpace(16f, 9f, space =>
+        {
+            space.Image(new Vec2(1, 1), new Vec2(15, 8), image);
+            space.Image(new Vec2(1, 1), new Vec2(15, 8), layer, nearest, new DebugStyle { Outline = false });
+            space.Circle(new Vec2(8, 4.5f), 0.5f);
+        });
+        debug.Image(Vec3.Zero, Vec3.UnitX, Vec3.UnitX + Vec3.UnitY, Vec3.UnitY, image, null, new DebugStyle { Duration = 60f });
+        Check.Equal(3ul, debug.ImageCount, "each asked for");
+        debug.Image(Vec3.Zero, Vec3.UnitX, Vec3.UnitX + Vec3.UnitY, Vec3.UnitY, layers);
+        Check.Equal(3ul, debug.ImageCount, "an image of several layers says which, by a view");
+        Frames(app, 4);
+        Check.Equal(1ul, debug.ImageCount, "what has a duration stays; the rest were for their frame");
+    }
+
+    /// <summary>Vectors of 8, 16 and 64 bits: they wrap, convert, and are laid out as C++'s and a shader's.</summary>
+    public static void SizedVectors()
+    {
+        Check.Equal(new U8Vec4(0), new U8Vec4(255) + new U8Vec4(1), "it wraps");
+        Check.Equal(new U8Vec4(15), new U8Vec4(0xF0) >> 4, "a logical shift, unsigned");
+        Check.Equal(new I8Vec2(-8), new I8Vec2(-16) >> 1, "an arithmetic one, signed");
+        Check.Equal(new I64Vec2(long.MinValue, 0), new I64Vec2(long.MaxValue, -1) + new I64Vec2(1), "64 bits");
+        Check.Equal(new Vec4(255, 0, 1, 2), (Vec4)new U8Vec4(255, 0, 1, 2), "to floats");
+        Check.Equal(new U8Vec3(1, 2, 3), (U8Vec3)new IVec3(257, 258, 259), "from a wider one, cut");
+        Check.Equal(new U8Vec4(255, 128, 0, 255), KMath.ToU8Vec4(new Vec4(1f, 0.5f, -1f, 2f)), "a colour as a texel");
+        Check.Equal(new Vec4(1, 0, 0, 1), KMath.FromU8Vec4(new U8Vec4(255, 0, 0, 255)), "and back");
+        Check.Equal(4, GpuLayout.Of<U8Vec4>().Stride, "a U8Vec4 is 4 bytes");
+        Check.Equal(4, GpuLayout.Of<U8Vec3>(GpuPacking.Std430).Stride, "a shader's vec3 steps as a vec4");
+        Check.Equal(32, GpuLayout.Of<I64Vec4>(GpuPacking.Std430).Alignment, "and 64 bits are twice the rest");
     }
 
     /// <summary>Filled shapes are triangles, and a gizmo dragged by a pointer of our own moves what it is on.</summary>

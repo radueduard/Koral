@@ -288,6 +288,29 @@ public record struct GizmoOptions()
     internal KoralGizmoOptions Native => new() { space = (uint)Space, size = Size, snap = Snap };
 }
 
+/// <summary>The shapes of a <see cref="DebugDraw.LogicSpace"/>: in two dimensions, as it is.</summary>
+public sealed class DebugDraw2D
+{
+    private readonly DebugDraw _debug;
+    internal DebugDraw2D(DebugDraw debug) => _debug = debug;
+
+    private static Vec3 Flat(Vec2 point) => new(point.X, point.Y, 0f);
+
+    public void Line(Vec2 from, Vec2 to, DebugStyle? style = null) => _debug.Line(Flat(from), Flat(to), style);
+    public void Arrow(Vec2 from, Vec2 to, DebugStyle? style = null) => _debug.Arrow(Flat(from), Flat(to), style);
+    public void Point(Vec2 position, float size = 0.1f, DebugStyle? style = null) => _debug.Point(Flat(position), size, style);
+    public void Rect(Vec2 min, Vec2 max, DebugStyle? style = null) =>
+        _debug.Quad(Flat(min), new Vec3(max.X, min.Y, 0f), Flat(max), new Vec3(min.X, max.Y, 0f), style);
+    public void Circle(Vec2 center, float radius, DebugStyle? style = null, int segments = 32) =>
+        _debug.Circle(Flat(center), new Vec3(0f, 0f, 1f), radius, style, segments);
+    /// <summary><paramref name="image"/> between two corners, upright, behind what else the space draws.</summary>
+    public void Image(Vec2 min, Vec2 max, Image image, Sampler? sampler = null, DebugStyle? style = null) =>
+        _debug.Image(Flat(min), new Vec3(max.X, min.Y, 0f), Flat(max), new Vec3(min.X, max.Y, 0f), image, sampler, style);
+    /// <summary><paramref name="view"/> between two corners: which level and layer of an image.</summary>
+    public void Image(Vec2 min, Vec2 max, ImageView view, Sampler? sampler = null, DebugStyle? style = null) =>
+        _debug.Image(Flat(min), new Vec3(max.X, min.Y, 0f), Flat(max), new Vec3(min.X, max.Y, 0f), view, sampler, style);
+}
+
 /// <summary>kor::DebugDraw: lines a scene draws to see what it is doing.</summary>
 public sealed unsafe class DebugDraw
 {
@@ -295,6 +318,18 @@ public sealed unsafe class DebugDraw
     internal DebugDraw(IntPtr native) => Native = native;
 
     private static KoralDebugStyle S(DebugStyle? style) => (style ?? new DebugStyle()).Native;
+
+    /// <summary>
+    /// Draws <paramref name="shapes"/> in a flat space <paramref name="width"/> by <paramref name="height"/>, fixed to
+    /// the view however the camera moves: (0, 0) at the bottom left, over everything. A view of another shape holds all
+    /// of it, centred, its units square. Only what <paramref name="shapes"/> draws is in it.
+    /// </summary>
+    public void LogicSpace(float width, float height, Action<DebugDraw2D> shapes)
+    {
+        KoralNative.koral_debug_begin_logic_space(Native, width, height);
+        try { shapes(new DebugDraw2D(this)); }
+        finally { KoralNative.koral_debug_end_logic_space(Native); }
+    }
 
     public void Line(Vec3 from, Vec3 to, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_line(Native, (float*)&from, (float*)&to, &s); }
     /// <summary>An axis-aligned box.</summary>
@@ -329,6 +364,21 @@ public sealed unsafe class DebugDraw
     {
         var s = S(style);
         KoralNative.koral_debug_plane(Native, (float*)&center, (float*)&normal, (float*)&size, &s);
+    }
+    /// <summary>
+    /// An image on four corners in order around the edge, from its bottom left. Behind the fills and lines of its space.
+    /// It needs eSampled among its usage; <paramref name="sampler"/> is linear and clamped when not given.
+    /// </summary>
+    public void Image(Vec3 a, Vec3 b, Vec3 c, Vec3 d, Image image, Sampler? sampler = null, DebugStyle? style = null)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_image(Native, (float*)&a, (float*)&b, (float*)&c, (float*)&d, image.Handle, sampler?.Handle ?? IntPtr.Zero, &s);
+    }
+    /// <summary>An image through a 2D <paramref name="view"/> of it: which level and layer, and how its channels are read.</summary>
+    public void Image(Vec3 a, Vec3 b, Vec3 c, Vec3 d, ImageView view, Sampler? sampler = null, DebugStyle? style = null)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_image_view(Native, (float*)&a, (float*)&b, (float*)&c, (float*)&d, view.Handle, sampler?.Handle ?? IntPtr.Zero, &s);
     }
     public void Cylinder(Vec3 from, Vec3 to, float radius, DebugStyle? style = null, int segments = 24)
     {
@@ -388,6 +438,7 @@ public sealed unsafe class DebugDraw
     public void Clear() => KoralNative.koral_debug_clear(Native);
     public ulong LineCount => KoralNative.koral_debug_line_count(Native);
     public ulong TriangleCount => KoralNative.koral_debug_triangle_count(Native);
+    public ulong ImageCount => KoralNative.koral_debug_image_count(Native);
 }
 
 /// <summary>kor::View: a scene drawn a second time, into an image of its own, by a graph of its own.</summary>

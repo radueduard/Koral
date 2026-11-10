@@ -44,6 +44,13 @@
 // initLibs.cpp — seeds GLFW's Vulkan loader; must run before glfwInit().
 void initGlfwVulkanLoader();
 
+namespace kor::capi
+{
+    /** What the C interface is asked to release between these two goes when the frame has: @see koral_resource_release */
+    void HoldReleases();
+    void ReleaseHeld();
+}
+
 namespace kor
 {
     namespace
@@ -61,8 +68,15 @@ namespace kor
             // ReloadLibrary would have nothing to reload. What is loaded is a copy, taken per load (a
             // name Windows has not seen, so it cannot hand back the old module); the library's own
             // directory is still searched for what it depends on.
-            static std::atomic<unsigned> loads = 0;
+            //
+            // Unless this very file is in the process already, as it is when a program binds to the library itself
+            // (the engine's C# and Kotlin layers) before asking for its scenes: a copy would be a second library, with
+            // statics of its own, and the program would be talking to the one the scenes are not in.
             std::error_code ec;
+            const auto whole = std::filesystem::absolute(path, ec).lexically_normal().make_preferred();
+            if (HMODULE loaded = nullptr; !ec && GetModuleHandleExW(0, whole.wstring().c_str(), &loaded)) return loaded;
+            ec.clear();
+            static std::atomic<unsigned> loads = 0;
             const auto copies = std::filesystem::temp_directory_path(ec) / "koral-libraries" / std::to_string(GetCurrentProcessId());
             auto copy = copies / std::format("{}-{}{}", path.stem().string(), loads++, path.extension().string());
             std::filesystem::create_directories(copies, ec);
@@ -922,6 +936,7 @@ namespace kor
         };
 
         impl.inFrame = true;
+        capi::HoldReleases();
         Context::Scheduler().Draw(windows, [&](CommandBuffer& commandBuffer) {
             tick();
             Context::Repository().Update();
@@ -969,6 +984,7 @@ namespace kor
             }
         });
         impl.inFrame = false;
+        capi::ReleaseHeld();
         if (!ticked) tick();    // a scheduler that drew nothing this frame: the clock goes on all the same
 
         for (const auto& stage : impl.stages) {

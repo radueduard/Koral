@@ -19,6 +19,12 @@ fun colorFromHex(rgb: UInt) = colorFromHex(rgb.toInt())
 fun colorFromHex(rgb: Int) = Vec4(((rgb shr 16) and 0xff) / 255f, ((rgb shr 8) and 0xff) / 255f, (rgb and 0xff) / 255f, 1f)
 /** 0xRRGGBBAA. */
 fun colorFromHexA(rgba: Int) = colorFromHex(rgba ushr 8).copy(w = (rgba and 0xff) / 255f)
+/** A colour as an RGBA8 texel: each channel clamped to [0, 1] and rounded, as the GPU packs it. */
+fun toU8Vec4(c: Vec4): U8Vec4 {
+    val p = packUnorm4x8(c)
+    return U8Vec4(p.toUByte(), (p shr 8).toUByte(), (p shr 16).toUByte(), (p shr 24).toUByte())
+}
+fun fromU8Vec4(c: U8Vec4) = c.toVec4() / 255f
 /** Perceived brightness of a linear colour. */
 fun luminance(linear: Vec3) = dot(linear, Vec3(0.2126f, 0.7152f, 0.0722f))
 

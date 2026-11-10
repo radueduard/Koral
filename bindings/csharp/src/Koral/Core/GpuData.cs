@@ -98,6 +98,24 @@ public sealed class GpuLayout
         if (type == typeof(UVec2)) return Blittable<UVec2>(VecAlign(2));
         if (type == typeof(UVec3)) return Blittable<UVec3>(VecAlign(3));
         if (type == typeof(UVec4)) return Blittable<UVec4>(VecAlign(4));
+        if (type == typeof(I8Vec2)) return Blittable<I8Vec2>(std ? 2 : 1);
+        if (type == typeof(I8Vec3)) return Blittable<I8Vec3>(std ? 4 : 1);
+        if (type == typeof(I8Vec4)) return Blittable<I8Vec4>(std ? 4 : 1);
+        if (type == typeof(U8Vec2)) return Blittable<U8Vec2>(std ? 2 : 1);
+        if (type == typeof(U8Vec3)) return Blittable<U8Vec3>(std ? 4 : 1);
+        if (type == typeof(U8Vec4)) return Blittable<U8Vec4>(std ? 4 : 1);
+        if (type == typeof(I16Vec2)) return Blittable<I16Vec2>(std ? 4 : 2);
+        if (type == typeof(I16Vec3)) return Blittable<I16Vec3>(std ? 8 : 2);
+        if (type == typeof(I16Vec4)) return Blittable<I16Vec4>(std ? 8 : 2);
+        if (type == typeof(U16Vec2)) return Blittable<U16Vec2>(std ? 4 : 2);
+        if (type == typeof(U16Vec3)) return Blittable<U16Vec3>(std ? 8 : 2);
+        if (type == typeof(U16Vec4)) return Blittable<U16Vec4>(std ? 8 : 2);
+        if (type == typeof(I64Vec2)) return Blittable<I64Vec2>(std ? 16 : 8);
+        if (type == typeof(I64Vec3)) return Blittable<I64Vec3>(std ? 32 : 8);
+        if (type == typeof(I64Vec4)) return Blittable<I64Vec4>(std ? 32 : 8);
+        if (type == typeof(U64Vec2)) return Blittable<U64Vec2>(std ? 16 : 8);
+        if (type == typeof(U64Vec3)) return Blittable<U64Vec3>(std ? 32 : 8);
+        if (type == typeof(U64Vec4)) return Blittable<U64Vec4>(std ? 32 : 8);
         if (type == typeof(Mat4)) return Blittable<Mat4>(VecAlign(4));
         if (type == typeof(Mat3))
             return !std ? Blittable<Mat3>(4) : new GpuLayout(type, 48, 16,

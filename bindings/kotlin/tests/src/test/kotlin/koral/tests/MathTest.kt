@@ -15,6 +15,24 @@ import kotlin.test.assertTrue
 // noise, matrices, geometry) must agree bit for bit; what goes through kotlin.math's sin and friends — which
 // round through double — to a few ULPs. No application: the math needs none.
 class MathTest {
+    @Test
+    fun sizedVectorsWrapAsTheirComponentsDo() {
+        val white = U8Vec4(255, 255, 255, 255)
+        assertEquals(255u.toUByte(), white.x, "an Int literal, cut to its bits")
+        assertEquals(U8Vec4(0), white + U8Vec4(1), "and it wraps")
+        assertEquals(U8Vec4(255, 0, 0, 255), U8Vec4(U8Vec2(255, 0), U8Vec2(0, 255)))
+        assertEquals(U8Vec4(15), U8Vec4(0xF0) shr 4, "a logical shift, unsigned")
+        assertEquals(I8Vec2(-8), I8Vec2(-16) shr 1, "an arithmetic one, signed")
+        assertEquals(I8Vec2(-128), I8Vec2(127) + I8Vec2(1))
+        assertEquals(U16Vec3(0xFFFF, 1, 2), I16Vec3(-1, 1, 2).toU16Vec3(), "signed to unsigned keeps the bits")
+        assertEquals(I64Vec2(Long.MIN_VALUE, 0), I64Vec2(Long.MAX_VALUE, -1) + I64Vec2(1, 1))
+        assertEquals(U64Vec2(0uL, 1uL), U64Vec2(ULong.MAX_VALUE, 0uL) + U64Vec2(1uL))
+        assertEquals(Vec4(255f, 0f, 1f, 2f), U8Vec4(255, 0, 1, 2).toVec4())
+        assertEquals(U8Vec3(1, 2, 3), IVec3(257, 258, 259).toU8Vec3(), "from a wider one, cut")
+        assertEquals(U8Vec4(255, 128, 0, 255), toU8Vec4(Vec4(1f, 0.5f, -1f, 2f)), "a colour as a texel: clamped and rounded")
+        assertEquals(Vec4(1f, 0f, 0f, 1f), fromU8Vec4(U8Vec4(255, 0, 0, 255)))
+    }
+
     private val a = Arena.ofAuto()
 
     private fun same(x: Float, y: Float) = x.toRawBits() == y.toRawBits() || (x.isNaN() && y.isNaN())

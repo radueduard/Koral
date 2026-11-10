@@ -275,6 +275,34 @@ public sealed unsafe partial class Buffer : Resource
         return new ConstMapping<T>(KoralNative.Check(mapping));
     }
 
+    /// <summary>
+    /// This buffer as an array of T: <c>buffer.As&lt;Particle&gt;()[i] = particle</c>. Unlike <see cref="Map{T}"/>, nothing is
+    /// held open, so it may be kept, in a field, and the buffer read, written and mapped meanwhile.
+    /// </summary>
+    public Elements<T> As<T>() where T : unmanaged => new(this);
+
+    /// <summary>
+    /// A buffer's values by index. Each index is a copy of its own, so what writes a whole buffer a frame is better as one
+    /// <see cref="Write{T}(ReadOnlySpan{T}, ulong)"/>, or a <see cref="Map{T}"/>.
+    /// </summary>
+    public readonly struct Elements<T> where T : unmanaged
+    {
+        private readonly Buffer _buffer;
+        internal Elements(Buffer buffer) => _buffer = buffer;
+
+        /// <summary>How many whole values the buffer holds.</summary>
+        public int Count => (int)(_buffer.Size / (ulong)sizeof(T));
+
+        public T this[int index]
+        {
+            get => _buffer.ReadAt<T>(At(index));
+            set => _buffer.WriteAt(At(index), value);
+        }
+
+        private ulong At(int index) =>
+            index >= 0 && index < Count ? (ulong)index : throw new IndexOutOfRangeException($"index {index} of a buffer of {Count} values");
+    }
+
     /// <summary>kor::Buffer::Slice: a range of a buffer, for a descriptor.</summary>
     public readonly record struct Slice(Buffer Buffer, long Offset = 0, long Size = 0);
 

@@ -204,7 +204,8 @@ namespace kui
             if (popup) {
                 // Everywhere the popup is not: a press there closes it, and goes no further.
                 layers.push_back(GestureDetector(GestureOptions {}.OnTapDown([this](kor::Vec2) { owner.closePopup(); }), SizedBox(1.e6f, 1.e6f)));
-                layers.push_back(Translate(popup->at, popup->widget));
+                // Inside the view, as big as it is laid out: wider than the room to the right of its anchor, it is moved left.
+                layers.push_back(TranslateInside(popup->at, popup->widget));
             }
             if (drag) layers.push_back(Translate(pointer - drag->hotspot, IgnorePointer(drag->feedback)));
             else if (!tip.empty()) {

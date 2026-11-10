@@ -1832,6 +1832,193 @@ TEST_F(GpuTest, AStandaloneDebugDrawShowsWhatItHoldsNow) {
     EXPECT_GT(downRow, 0) << "the second line was never uploaded";
 }
 
+// An image among the debug shapes: upright, read by the sampler it is given, of the level and layer its view says, and
+// behind what the same space draws — in a frame that has just written it, whatever it was left as.
+TEST_F(GpuTest, ADebugImageIsDrawnUprightBehindTheShapesOfItsSpace) {
+    auto color = Image::Builder{}
+                     .SetType(Image::Type::e2D)
+                     .SetFormat(Image::Format::eRGBA8_UNORM)
+                     .SetExtent(kor::UVec2{kW, kH})
+                     .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
+                     .Build();
+    auto colorView = ImageView::Builder(color).Build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
+                           .Build();
+    auto readback = Buffer::RawBuilder{}
+                        .SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
+                        .SetUsage(Buffer::Usage::eTransferDst)
+                        .SetType(Buffer::Type::eReadback)
+                        .Build();
+
+    const Pixel red{255, 0, 0, 255}, green{0, 255, 0, 255}, blue{0, 0, 255, 255}, white{255, 255, 255, 255}, black{0, 0, 0, 255};
+    // Two rows of two, the first row the top: red and green over blue and white.
+    auto picture = Image::Builder{}
+                       .SetType(Image::Type::e2D)
+                       .SetFormat(Image::Format::eRGBA8_UNORM)
+                       .SetExtent(kor::UVec2{2, 2})
+                       .SetUsage(Image::Usage::eSampled | Image::Usage::eTransferDst)
+                       .SetData(std::vector<Pixel>{red, green, blue, white})
+                       .Build();
+    // Two layers of one colour each, and a view of the second.
+    auto layers = Image::Builder{}
+                      .SetType(Image::Type::e2D)
+                      .SetFormat(Image::Format::eRGBA8_UNORM)
+                      .SetExtent(kor::UVec2{1, 1})
+                      .SetArrayLayers(2)
+                      .SetUsage(Image::Usage::eSampled | Image::Usage::eTransferDst)
+                      .Build();
+    auto layerColors = Buffer::Builder<Pixel>{}.SetData(std::vector<Pixel>{red, blue}).SetUsage(Buffer::Usage::eTransferSrc).SetType(Buffer::Type::eDynamic).Build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyBufferToImage(layerColors, layers, kor::Copy{ .imageBaseArrayLayer = 0, .imageLayerCount = 2 });
+    }, CommandBuffer::Usage::eTransfer).Wait();
+    auto secondLayer = ImageView::Builder(layers).SetBaseArrayLayer(1).SetArrayLayerCount(1).Build();
+    auto nearest = Sampler::Builder{}.SetMinFilter(kor::Filter::eNearest).SetMagFilter(kor::Filter::eNearest).Build();
+    auto unsampled = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2{1, 1})
+                         .SetUsage(Image::Usage::eTransferDst).Build();
+
+    kor::DebugDraw draw;
+    const auto render = [&] {
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+            cb.BeginRendering(framebuffer);
+            cb.EndRendering();
+            draw.Render(cb, kor::Mat4(1.f), framebuffer);
+            EXPECT_TRUE(cb.Ok());
+        }, CommandBuffer::Usage::eGraphics).Wait();
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.CopyImageToBuffer(color, readback); },
+                                         CommandBuffer::Usage::eTransfer).Wait();
+        const auto pixels = readback->Read<Pixel>();
+        return std::vector<Pixel>(pixels.begin(), pixels.end());
+    };
+    const auto at = [](const std::vector<Pixel>& pixels, const std::uint32_t x, const std::uint32_t y) { return pixels[y * kW + x]; };
+    const float wide = static_cast<float>(kW), high = static_cast<float>(kH);
+    const kor::DebugStyle bare {.outline = false};
+
+    // The whole of a logic space, its image behind a square drawn after it — and the same asked in the other order.
+    draw.BeginLogicSpace({ wide, high });
+    draw.Quad({ 6.f, 6.f, 0.f }, { 10.f, 6.f, 0.f }, { 10.f, 10.f, 0.f }, { 6.f, 10.f, 0.f }, {.fill = {0.f, 0.f, 0.f, 1.f}, .outline = false});
+    draw.Image({ 0.f, 0.f, 0.f }, { wide, 0.f, 0.f }, { wide, high, 0.f }, { 0.f, high, 0.f }, picture, nearest, bare);
+    draw.EndLogicSpace();
+    EXPECT_EQ(draw.ImageCount(), 1u);
+    const auto upright = render();
+    EXPECT_EQ(at(upright, 1, 1), red) << "its first row at the top";
+    EXPECT_EQ(at(upright, kW - 2, 1), green);
+    EXPECT_EQ(at(upright, 1, kH - 2), blue);
+    EXPECT_EQ(at(upright, kW - 2, kH - 2), white);
+    EXPECT_EQ(at(upright, kW / 2, kH / 2), black) << "the square over it, though it was drawn first";
+
+    // Read by the default sampler instead, between its texels: neither of them.
+    draw.Clear();
+    draw.BeginLogicSpace({ wide, high });
+    draw.Image({ 0.f, 0.f, 0.f }, { wide, 0.f, 0.f }, { wide, high, 0.f }, { 0.f, high, 0.f }, picture, {}, bare);
+    draw.EndLogicSpace();
+    const Pixel between = at(render(), kW / 2, 1);
+    EXPECT_GT(between.x, 0) << "linear, when no sampler is given";
+    EXPECT_GT(between.y, 0);
+
+    // A view says which layer. The world's camera is the identity: z 0.5, across the whole of the target.
+    draw.Clear();
+    draw.Image({ -1.f, -1.f, 0.5f }, { 1.f, -1.f, 0.5f }, { 1.f, 1.f, 0.5f }, { -1.f, 1.f, 0.5f }, secondLayer, nearest, bare);
+    const auto layer = render();
+    EXPECT_EQ(at(layer, kW / 2, kH / 2), blue) << "the second layer, in the world";
+
+    // A tint, from the style's fill; several images in one frame, each its own. This camera does not turn y over, as a
+    // projection does: what is the picture's top is the target's bottom row.
+    draw.Clear();
+    draw.Image({ -1.f, -1.f, 0.5f }, { 0.f, -1.f, 0.5f }, { 0.f, 1.f, 0.5f }, { -1.f, 1.f, 0.5f }, secondLayer, nearest, bare);
+    draw.Image({ 0.f, -1.f, 0.5f }, { 1.f, -1.f, 0.5f }, { 1.f, 1.f, 0.5f }, { 0.f, 1.f, 0.5f }, picture, nearest,
+               {.fill = {0.f, 1.f, 1.f, 1.f}, .outline = false});
+    EXPECT_EQ(draw.ImageCount(), 2u);
+    const auto two = render();
+    EXPECT_EQ(at(two, 2, kH / 2), blue);
+    EXPECT_EQ(at(two, kW - 2, kH - 2), green) << "one tinted: green stays";
+    EXPECT_EQ(at(two, kW / 2 + 2, kH - 2), black) << "and red, without its red, is nothing";
+
+    // What cannot be read is left out and the rest of the frame drawn; the target itself the same.
+    draw.Clear();
+    draw.Image({ -1.f, -1.f, 0.5f }, { 1.f, -1.f, 0.5f }, { 1.f, 1.f, 0.5f }, { -1.f, 1.f, 0.5f }, unsampled, nearest, bare);
+    EXPECT_EQ(draw.ImageCount(), 0u) << "an image not made to be sampled";
+    draw.Image({ -1.f, -1.f, 0.5f }, { 1.f, -1.f, 0.5f }, { 1.f, 1.f, 0.5f }, { -1.f, 1.f, 0.5f }, layers, nearest, bare);
+    EXPECT_EQ(draw.ImageCount(), 0u) << "nor one of several layers, without a view to say which";
+    draw.Line({ -1.f, 0.f, 0.5f }, { 1.f, 0.f, 0.5f });
+    const auto without = render();
+    EXPECT_EQ(at(without, 2, 2), black);
+    EXPECT_GT(std::max(at(without, 2, kH / 2 - 1).x, at(without, 2, kH / 2).x), 0) << "the line is still drawn";
+}
+
+// A logic space is the view's: the camera does not move it, its (0, 0) is at the bottom left, a view of another
+// shape holds all of it without stretching it, and what is drawn after it is back in the world.
+TEST_F(GpuTest, ALogicSpaceIsFixedToTheViewAndEndsWhereItIsEnded) {
+    auto color = Image::Builder{}
+                     .SetType(Image::Type::e2D)
+                     .SetFormat(Image::Format::eRGBA8_UNORM)
+                     .SetExtent(kor::UVec2{kW, kH})
+                     .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
+                     .Build();
+    auto colorView = ImageView::Builder(color).Build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
+                           .Build();
+    auto readback = Buffer::RawBuilder{}
+                        .SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
+                        .SetUsage(Buffer::Usage::eTransferDst)
+                        .SetType(Buffer::Type::eReadback)
+                        .Build();
+
+    kor::DebugDraw draw;
+    kor::Mat4 camera(1.f);
+    camera[3][0] = 0.5625f; // what is in the world is moved right, to the middle of column 12 of the 16
+    const auto render = [&] {
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+            cb.BeginRendering(framebuffer);
+            cb.EndRendering();
+            draw.Render(cb, camera, framebuffer);
+        }, CommandBuffer::Usage::eGraphics).Wait();
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.CopyImageToBuffer(color, readback); },
+                                         CommandBuffer::Usage::eTransfer).Wait();
+        const auto pixels = readback->Read<Pixel>();
+        return std::vector<Pixel>(pixels.begin(), pixels.end());
+    };
+    const auto litInRow = [](const std::vector<Pixel>& pixels, const std::uint32_t row) {
+        int lit = 0;
+        for (std::uint32_t i = 0; i < kW; ++i) lit += pixels[row * kW + i].x > 0;
+        return lit;
+    };
+    const auto litInColumn = [](const std::vector<Pixel>& pixels, const std::uint32_t column) {
+        int lit = 0;
+        for (std::uint32_t i = 0; i < kH; ++i) lit += pixels[i * kW + column].x > 0;
+        return lit;
+    };
+    const float wide = static_cast<float>(kW), high = static_cast<float>(kH);
+
+    // A line along the bottom, in a space the shape of the view, and one up the middle of the world after it.
+    draw.BeginLogicSpace({ wide, high });
+    draw.Line({ 0.f, 1.5f, 0.f }, { wide, 1.5f, 0.f });
+    draw.EndLogicSpace();
+    draw.Line({ 0.f, -1.f, 0.5f }, { 0.f, 1.f, 0.5f });
+    const auto fixed = render();
+    EXPECT_GE(litInRow(fixed, kH - 2), static_cast<int>(kW) - 1) << "its (0, 0) is at the bottom left, and the camera does not move it";
+    EXPECT_LE(litInRow(fixed, 1), 1) << "not at the top";
+    EXPECT_GE(litInColumn(fixed, kW * 3 / 4), static_cast<int>(kH) - 1) << "after it, the world and the camera again";
+    EXPECT_LE(litInColumn(fixed, kW / 2), 1) << "the world's line is not in the logic space";
+
+    // A space twice as wide as the view: all of it is held, half as tall as the view, in the middle.
+    draw.Clear();
+    draw.BeginLogicSpace({ wide * 2.f, high });
+    draw.Line({ 0.f, 0.f, 0.f }, { wide * 2.f, 0.f, 0.f });
+    draw.Line({ 0.f, high, 0.f }, { wide * 2.f, high, 0.f });
+    draw.EndLogicSpace();
+    const auto fitted = render();
+    const auto rowOfLight = [&](const std::uint32_t from, const std::uint32_t to) {
+        for (std::uint32_t row = from; row < to; ++row)
+            if (litInRow(fitted, row) >= static_cast<int>(kW) - 1) return true;
+        return false;
+    };
+    EXPECT_TRUE(rowOfLight(kH * 3 / 4 - 2, kH * 3 / 4 + 2)) << "its bottom, a quarter of the view up";
+    EXPECT_TRUE(rowOfLight(kH / 4 - 2, kH / 4 + 2)) << "its top, a quarter of the view down";
+    EXPECT_EQ(litInRow(fitted, kH - 2), 0) << "nothing below it: it is not stretched to the view";
+}
+
 // An image no device can make is refused where it is asked for, with why. Handed on, one with no usage was an
 // assertion in the allocator — a crash — and one with no size an error from the driver that named neither.
 TEST_F(GpuTest, AnImageWithNoUsageOrNoSizeIsRefusedNotMade) {

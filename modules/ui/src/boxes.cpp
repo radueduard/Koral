@@ -585,11 +585,25 @@ namespace kui
         canvas.Restore();
     }
 
-    void RenderTranslate::Set(const kor::Vec2 by)
+    void RenderTranslate::Set(const kor::Vec2 by, const bool inside)
     {
-        if (by == _by) return;
+        if (by == _by && inside == _inside) return;
         _by = by;
+        _inside = inside;
         MarkNeedsPaint();
+    }
+
+    kor::Vec2 RenderTranslate::ChildOrigin(const RenderObject& child) const
+    {
+        if (!_inside) return child.Offset() + _by;
+        // As big as it is now laid out, inside the most it could have been: a margin from each edge, and from the far
+        // edges first — what is bigger than the room is kept at its near edge.
+        constexpr float Margin = 4.f;
+        const BoxConstraints& room = Constraints();
+        kor::Vec2 at = _by;
+        if (std::isfinite(room.maxWidth)) at.x = std::min(at.x, room.maxWidth - child.Size().x - Margin);
+        if (std::isfinite(room.maxHeight)) at.y = std::min(at.y, room.maxHeight - child.Size().y - Margin);
+        return child.Offset() + kor::Max(at, kor::Vec2(Margin));
     }
 
     bool RenderTranslate::HitTest(HitTestResult& result, const kor::Vec2 position)
@@ -1030,6 +1044,12 @@ namespace kui
     Widget Translate(const kor::Vec2 offset, Widget child)
     {
         return box<RenderTranslate, kor::Vec2>(offset, one(std::move(child)), [](RenderTranslate& r, const kor::Vec2& c) { r.Set(c); });
+    }
+
+    Widget TranslateInside(const kor::Vec2 offset, Widget child)
+    {
+        struct Config { kor::Vec2 by; };
+        return box<RenderTranslate, Config>({ offset }, one(std::move(child)), [](RenderTranslate& r, const Config& c) { r.Set(c.by, true); });
     }
 
     Widget IgnorePointer(Widget child)

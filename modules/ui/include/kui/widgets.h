@@ -588,6 +588,11 @@ namespace kui
     KUI_API Widget ClipRRect(Radii radius, Widget child);
     /** @brief The child, moved by @p offset where it paints and is hit — its layout, and its parent's, unchanged. */
     KUI_API Widget Translate(kor::Vec2 offset, Widget child);
+    /**
+     * @brief The child moved by @p offset, and back by as little as it takes for all of it to be inside the room it
+     *        is given, a few units from each edge: what a popup is, near the edge of the view.
+     */
+    KUI_API Widget TranslateInside(kor::Vec2 offset, Widget child);
 
     /** @brief The child, which the pointer goes through as if it were not there. */
     KUI_API Widget IgnorePointer(Widget child);
