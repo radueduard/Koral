@@ -30,6 +30,12 @@ import koral.interop.Native
  * A pass's is valid only while it records. One made with [create] is the scene's (or the application's),
  * and closed with it.
  */
+/**
+ * The Kotlin object for a KoralCommandBuffer* another's C interface hands over — a pass an engine records, its
+ * `kor::CommandBuffer&` as a handle. Borrowed: valid only while that recording is, and closing it lets go of nothing.
+ */
+fun commandBufferFromHandle(native: MemorySegment): CommandBuffer = CommandBuffer(native)
+
 class CommandBuffer internal constructor(native: MemorySegment, private val owned: Boolean = false) : AutoCloseable {
     private var handle = native
     private val n: MemorySegment

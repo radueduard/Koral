@@ -858,6 +858,27 @@ TEST_F(GpuTest, PushConstantByNameRejectsWhatTheShaderDoesNotDeclare) {
     unbound->End();
     ASSERT_FALSE(unbound->Errors().empty());
     EXPECT_EQ(unbound->Errors().front().code, kor::ErrorCode::eNoPipelineBound);
+
+    // A rendering written after the first error is dropped whole: its BeginRendering is not recorded, and so neither is
+    // its EndRendering — ending a rendering the device never began crashed the driver as the buffer was ended.
+    const auto after = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    after->Begin();
+    after->PushConstant("color", kor::Vec4{1.f});
+    after->BeginRendering(framebuffer);
+    after->BindGraphicsPipeline(pipeline);
+    after->Draw(3);
+    after->EndRendering();
+    after->End();
+    ASSERT_EQ(after->Errors().size(), 1u) << "only the first error: what came after it is not recorded";
+    EXPECT_EQ(after->Errors().front().code, kor::ErrorCode::eNoPipelineBound);
+
+    // And an end with nothing begun, on a buffer with no error, is one.
+    const auto unbegun = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    unbegun->Begin();
+    unbegun->EndRendering();
+    unbegun->End();
+    ASSERT_FALSE(unbegun->Errors().empty());
+    EXPECT_NE(unbegun->Errors().front().message.find("no rendering begun"), std::string::npos) << unbegun->Errors().front().message;
 }
 
 // How far the by-name lookup reaches into a block: to its top-level members and no further.

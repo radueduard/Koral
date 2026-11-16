@@ -970,6 +970,13 @@ namespace kor
 
     CommandBuffer& CommandBuffer::EndRendering()
     {
+        // Only a rendering that was begun is ended. A BeginRendering a failed buffer dropped (the railway: nothing
+        // after the first error is recorded) left nothing open, and an end emitted for it ended a rendering the
+        // device never began — the driver read rendering state that was not there, and crashed in the end's record.
+        if (!_state.boundFramebuffer.has_value()) {
+            if (_failed) return *this;
+            return RecordError(ErrorCode::eInvalidArgument, "EndRendering with no rendering begun: BeginRendering first.");
+        }
         StateEndRendering();
         return DoEndRendering();
     }
