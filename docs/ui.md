@@ -466,7 +466,7 @@ failures in `koral_last_error()`, enumerations as their C++ values.
 
 `modules/ui/tests/test_capi.c` is a complete example.
 
-## From C#
+## In C#
 
 `Koral.UI` (shipped with koral-dotnet, so scripts can use it) is the C++ API in C#: the same names and
 the same chaining. `using static Koral.UI.Widgets;` makes the building blocks read as they do in C++:

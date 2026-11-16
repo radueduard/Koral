@@ -3,7 +3,7 @@
 Koral has one way to say "after this has happened": a `kor::Token`. A token stands for an event (a submission
 finishing, a frame completing, a task finishing, something the CPU signals) and it can be waited on, `co_await`ed,
 or handed to the GPU to wait on. Concurrency is coroutines (`kor::Task`) that suspend on tokens, not raw threads.
-The design is in [v2 foundation design](v2-foundation-design.md).
+The design is in [v2 foundation design](https://github.com/radueduard/Koral/blob/v2-development/docs/v2-foundation-design.md).
 
 ## Tokens
 

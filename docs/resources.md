@@ -58,7 +58,7 @@ auto albedo = kor::Image::Builder{}
 - **Usage**: `eSampled` (a texture), `eStorage`, `eColorAttachment`, `eDepthStencilAttachment`, and the
   transfer roles: `eTransferDst` to upload, `eTransferSrc` to read back or generate mipmaps.
 - **Formats** include 8, 16 and 32-bit colour formats, depth and stencil formats, and block-compressed formats
-  (BC, ETC2, ASTC). The image modules ([`kimg`](../modules)) load and save files, and transcode KTX2.
+  (BC, ETC2, ASTC). The image modules ([`kimg`](https://github.com/radueduard/Koral/tree/v2-development/modules)) load and save files, and transcode KTX2.
 - **Views**: `image->View(shape, …)` returns a view of a mip range, an array layer range, or a cube. Views are
   cached, and stay valid across `Resize`.
 - **Resize**: `image->Resize(extent)` replaces the storage. Framebuffers, views and descriptor sets made from
@@ -89,7 +89,7 @@ auto mesh = kor::Mesh::Builder{}.SetVertexLayout(layout)
 
 Attributes are matched to a vertex shader's inputs by **semantic**: the shader annotates them (Slang `: POSITION`,
 GLSL `#pragma mesh(POSITION)`). A layout that names no semantics is matched by location instead: an attribute's
-`location`, or else its place in the list. The mesh module ([`kmesh`](../modules)) describes common vertex
+`location`, or else its place in the list. The mesh module ([`kmesh`](https://github.com/radueduard/Koral/tree/v2-development/modules)) describes common vertex
 formats for you.
 
 **Matrices, arrays and instancing.** An input of several locations, such as a `mat4` (one location per column),

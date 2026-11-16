@@ -1,0 +1,95 @@
+# The Koral wiki: the guides in docs/, built into a site by MkDocs and published to GitHub Pages
+# (.github/workflows/wiki.yml). Locally:
+#
+#   pip install -r docs/requirements.txt
+#   mkdocs serve            # http://127.0.0.1:8000, rebuilt as a page is saved
+#   mkdocs build --strict   # what the workflow does: a broken link fails it
+site_name: Koral
+site_description: A C++ framework for real-time graphics on Vulkan, with C, C# and Kotlin bindings.
+site_url: https://radueduard.github.io/Koral/
+repo_url: https://github.com/radueduard/Koral
+repo_name: radueduard/Koral
+edit_uri: edit/v2-development/docs/
+docs_dir: docs
+
+# What is in docs/ for the repository's own sake, not the wiki's: the index GitHub shows when the folder is
+# browsed, a design not yet built, and how the release runner is set up.
+exclude_docs: |
+  requirements.txt
+  README.md
+  v2-foundation-design.md
+  self-hosted-runner.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: teal
+      toggle: { icon: material/weather-night, name: Dark }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: teal
+      toggle: { icon: material/weather-sunny, name: Light }
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Building the SDK: getting-started/building.md
+      - A first program: getting-started/first-program.md
+      - How Koral fits together: getting-started/overview.md
+  - Core:
+      - Scenes and the application: scenes.md
+      - Buffers, images and meshes: resources.md
+      - Shaders, pipelines and GPU features: pipelines.md
+      - Descriptors and bindless: descriptors.md
+      - Command buffers: commands.md
+      - The frame graph: frame-graph.md
+      - Tokens and tasks: tokens.md
+      - Parallel work and waiting: parallel.md
+      - Configuring a project: configuration.md
+      - Errors: errors.md
+  - Modules:
+      - Modules, the camera and debug drawing: modules.md
+      - Interfaces with koral-ui: ui.md
+      - Input: input.md
+      - Mathematics: math.md
+      - Networking: networking.md
+      - Reflection and serialization: reflection.md
+  - Languages:
+      - The C interface: c-api.md
+      - C#: csharp.md
+      - Kotlin and Compose: kotlin.md

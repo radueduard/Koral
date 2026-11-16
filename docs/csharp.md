@@ -217,7 +217,7 @@ scenes only, on a machine with no display. The bindings' own tests run that way.
 
 `Koral.UI`, the C# binding of the koral-ui module, ships with koral-dotnet. Widgets, the canvas and
 element shaders read as they do in C++, and editing a widget while it runs rebuilds it in place with its
-state kept. See [Interfaces with koral-ui](ui.md#from-c-1).
+state kept. See [Interfaces with koral-ui](ui.md#in-c).
 
 Everything the module has is there, under its C++ name: `LazyList`, `Intrinsic`, `CustomLayout`, `Themed`,
 `MenuBar` and `ContextMenu`, `Table`, `TreeNode`, `TabBar`, `Dropdown`, `DragValue`, `StepSlider`, `ColorPicker`,
