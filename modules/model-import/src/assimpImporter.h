@@ -104,6 +104,7 @@ namespace kmdl {
         const bool indexed = extension == ".gltf" || extension == ".glb";
         _scene = _importer.ReadFile(path.string(),
             aiProcess_Triangulate | (indexed ? 0u : static_cast<unsigned>(aiProcess_JoinIdenticalVertices)) | aiProcess_SortByPType | aiProcess_GenBoundingBoxes
+            | aiProcess_LimitBoneWeights        // four bones a vertex at most, the strongest: what BONE_IDS and BONE_WEIGHTS hold
             | aiProcess_GenUVCoords | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 
         // Assimp returns null when the file is missing or unreadable, or a step failed. Bail out
@@ -229,7 +230,18 @@ namespace kmdl {
                         }
                     }
                 }
+                // Its bone, as a vertex's id counts it: its node's name, and the matrix that takes the mesh as it was
+                // bound into the bone's space — assimp's rows, made Koral's columns.
+                const aiMatrix4x4& m = bone->mOffsetMatrix;
+                result.bones.push_back({ bone->mName.C_Str(), kor::Mat4(m.a1, m.b1, m.c1, m.d1, m.a2, m.b2, m.c2, m.d2,
+                                                                        m.a3, m.b3, m.c3, m.d3, m.a4, m.b4, m.c4, m.d4) });
             }
+            // Each vertex's weights adding up to one: what is left of more than four bones, shared among the four.
+            for (auto& w : boneWeights) {
+                const float total = w.x + w.y + w.z + w.w;
+                if (total > 0.f) w = w / total;
+            }
+            result.boneData = std::pair { std::move(boneWeights), std::move(boneIDs) };
         }
 
         if (mesh->HasFaces()) {
@@ -541,6 +553,37 @@ namespace kmdl {
             for (unsigned int i = 0; i < currentNode->mNumChildren; ++i) {
                 nodeQueue.emplace(currentNode->mChildren[i], nodeIndex);
             }
+        }
+
+        // Animations: each channel's keys, in seconds from the start.
+        for (unsigned int i = 0; i < _scene->mNumAnimations; ++i) {
+            const aiAnimation* from = _scene->mAnimations[i];
+            const double perSecond = from->mTicksPerSecond > 0.0 ? from->mTicksPerSecond : 25.0;
+            Animation animation;
+            animation.name = from->mName.length > 0 ? from->mName.C_Str() : "Animation " + std::to_string(i);
+            animation.duration = static_cast<float>(from->mDuration / perSecond);
+            for (unsigned int c = 0; c < from->mNumChannels; ++c) {
+                const aiNodeAnim* channel = from->mChannels[c];
+                Animation::Channel to;
+                to.node = channel->mNodeName.C_Str();
+                for (unsigned int k = 0; k < channel->mNumPositionKeys; ++k) {
+                    const auto& key = channel->mPositionKeys[k];
+                    to.positionTimes.push_back(static_cast<float>(key.mTime / perSecond));
+                    to.positions.emplace_back(key.mValue.x, key.mValue.y, key.mValue.z);
+                }
+                for (unsigned int k = 0; k < channel->mNumRotationKeys; ++k) {
+                    const auto& key = channel->mRotationKeys[k];
+                    to.rotationTimes.push_back(static_cast<float>(key.mTime / perSecond));
+                    to.rotations.emplace_back(key.mValue.x, key.mValue.y, key.mValue.z, key.mValue.w);
+                }
+                for (unsigned int k = 0; k < channel->mNumScalingKeys; ++k) {
+                    const auto& key = channel->mScalingKeys[k];
+                    to.scaleTimes.push_back(static_cast<float>(key.mTime / perSecond));
+                    to.scales.emplace_back(key.mValue.x, key.mValue.y, key.mValue.z);
+                }
+                animation.channels.push_back(std::move(to));
+            }
+            result.animations.push_back(std::move(animation));
         }
 
         // Punctual lights (e.g. glTF KHR_lights_punctual). assimp stores each light's

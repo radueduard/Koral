@@ -385,6 +385,16 @@ namespace kor {
         FrameGraph(const FrameGraph&) = delete;
         FrameGraph& operator=(const FrameGraph&) = delete;
 
+        /**
+         * @brief The framebuffer of the window Screen is the image of: its Window::DefaultFramebuffer, with the
+         *        window's depth beside its picture.
+         *
+         * What a pipeline that draws straight into the window is made for, and what such a pass opens — having
+         * said it writes Screen as Image::Usage::eColorAttachment. The window keeps it, and resizes it in place:
+         * the reference is good for as long as the window is. Empty outside a scene.
+         */
+        [[nodiscard]] ResourceRef<const Framebuffer> ScreenFramebuffer() const;
+
         /** @brief Adds a pass. The order passes are added in breaks ties between passes free to run in either order. */
         template<std::derived_from<RenderPass> P, typename... Args>
         P& Add(Args&&... args) {

@@ -1239,6 +1239,7 @@ void kor::capi::ReleaseHeld()
 kor::ResourceRef<const kor::Image> kor::capi::ImageOf(KoralResource* handle) { return RefOf<Image>(handle); }
 KoralResource* kor::capi::BorrowImage(const ResourceRef<const Image>& image) { return Borrow(image); }
 KoralResource* kor::capi::BorrowBuffer(const ResourceRef<const Buffer>& buffer) { return Borrow(buffer); }
+KoralResource* kor::capi::BorrowFramebuffer(const ResourceRef<const Framebuffer>& framebuffer) { return Borrow(framebuffer); }
 kor::ResourceRef<const kor::Buffer> kor::capi::BufferOf(KoralResource* handle) { return RefOf<Buffer>(handle); }
 kor::ResourceRef<const kor::ImageView> kor::capi::ImageViewOf(KoralResource* handle) { return RefOf<ImageView>(handle); }
 kor::ResourceRef<const kor::Sampler> kor::capi::SamplerOf(KoralResource* handle) { return RefOf<Sampler>(handle); }

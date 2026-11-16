@@ -35,6 +35,8 @@ namespace kor::log
     namespace { thread_local int t_quiet = 0; }
     Quiet::Quiet() { ++t_quiet; }
     Quiet::~Quiet() { --t_quiet; }
+    Loud::Loud() : _was(t_quiet) { t_quiet = 0; }
+    Loud::~Loud() { t_quiet = _was; }
 
     Repeat Track(const std::string& message)
     {

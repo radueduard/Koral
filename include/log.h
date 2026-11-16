@@ -74,6 +74,23 @@ namespace kor::log {
         Quiet& operator=(const Quiet&) = delete;
     };
 
+    /**
+     * @brief While one is alive, this thread's warnings and errors are shown again, though a Quiet around it said
+     *        otherwise; as it goes, they are as they were.
+     *
+     * For someone else's code called from inside a Quiet: a user's script, run while an editor builds — what it says
+     * is its author's to read, not the builder's to keep.
+     */
+    class KORAL_API Loud {
+    public:
+        Loud();
+        ~Loud();
+        Loud(const Loud&) = delete;
+        Loud& operator=(const Loud&) = delete;
+    private:
+        int _was;
+    };
+
     /** @brief Whether @p message should be shown at all. Equivalent to Track() != eSuppress. */
     [[nodiscard]] KORAL_API bool ShouldEmit(const std::string& message);
 

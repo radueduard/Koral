@@ -382,6 +382,20 @@ class ComposeUi(theme: Theme = KoralDarkTheme, scale: Float = 1f, content: @Comp
     /** Recomposes what changed, hands koral-ui what that rebuilt, and lets it take the scene's input. */
     fun update() {
         if (closed) return
+        compose()
+        val made = System.nanoTime()
+        KuiNative.kui_ui_update(ui)
+        koral.checkLastError()
+        timings = timings.copy(nativeMs = (System.nanoTime() - made) / 1e6)
+    }
+
+    /**
+     * What [update] does but take the input: what changed recomposed and handed to koral-ui. For an interface whose
+     * input another drives — an engine that shows it in a panel, over a picture of its own size — with
+     * `kui_ui_update_with` on [handle], after this, each frame.
+     */
+    fun compose() {
+        if (closed) return
         val start = System.nanoTime()
         Snapshot.sendApplyNotifications()
         dispatcher.pump()
@@ -395,10 +409,11 @@ class ComposeUi(theme: Theme = KoralDarkTheme, scale: Float = 1f, content: @Comp
         val made = System.nanoTime()
         // Its pointer's places, heard during the update, are told in pixels: as many to a unit as it is drawn at.
         PointerPixels.perUnit = KuiNative.kui_ui_pixel_scale(ui)
-        KuiNative.kui_ui_update(ui)
-        koral.checkLastError()
-        timings = Timings((composed - start) / 1e6, (made - composed) / 1e6, (System.nanoTime() - made) / 1e6)
+        timings = Timings((composed - start) / 1e6, (made - composed) / 1e6, 0.0)
     }
+
+    /** The koral-ui interface it builds (a `KuiUi*`): what another drives, draws and asks about through koral-ui's C interface. */
+    val handle: MemorySegment get() = ui
 
     /**
      * Where the last update's time went, in milliseconds: Compose recomposing what changed; the widgets of what

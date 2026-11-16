@@ -162,6 +162,13 @@ namespace kmdl
             std::unordered_map<kor::u32, std::vector<kor::Vec3>> vertexColors;      ///< Vertex colour sets, keyed by channel.
             std::unordered_map<kor::u32, std::vector<kor::Vec2>> vertexUVs;         ///< Texture coordinate sets, keyed by channel.
             std::optional<std::pair<std::vector<kor::Vec4>, std::vector<kor::UVec4>>> boneData;  ///< Skinning weights and the bone ids they apply to.
+            /** @brief A bone the mesh is skinned by: what a vertex's bone id counts, in this order. */
+            struct Bone {
+                std::string name;   ///< Its node's name: the node that moves it.
+                /// The inverse bind matrix: from the mesh's space, as it was bound, into the bone's (column-major).
+                kor::Mat4 offset = kor::Mat4(1.f);
+            };
+            std::vector<Bone> bones;                                                ///< Empty for a mesh not skinned.
             std::optional<std::vector<kor::u32>> indices;                           ///< Triangle indices, if the mesh is indexed.
         };
 
@@ -224,6 +231,22 @@ namespace kmdl
             bool      atNode = false;                           ///< As Light::atNode: where it is and which way it looks are all its node's.
         };
 
+        /**
+         * @brief An animation of the file's: how its nodes move over time, a channel each — keys of where it is, how
+         *        it is turned and how big it is, relative to its parent, each at a time in seconds from the start.
+         */
+        struct KMDL_API Animation {
+            struct Channel {
+                std::string node;                                       ///< The node it moves, by name.
+                std::vector<float> positionTimes, rotationTimes, scaleTimes;
+                std::vector<kor::Vec3> positions;
+                std::vector<kor::Vec4> rotations;                       ///< Quaternions: x, y, z, w.
+                std::vector<kor::Vec3> scales;
+            };
+            std::string name;
+            float duration = 0.f;                                       ///< In seconds.
+            std::vector<Channel> channels;
+        };
         /** @brief Everything a model file contains. */
         struct KMDL_API Scene {
             std::vector<Mesh> meshes;           ///< Geometry, referenced by Node::meshIndices.
@@ -231,6 +254,7 @@ namespace kmdl
             std::vector<Node> nodes;            ///< The scene graph. Node 0 is the root.
             std::vector<Light> lights;          ///< Lights the file declares.
             std::vector<Camera> cameras;        ///< Cameras the file declares.
+            std::vector<Animation> animations;  ///< Animations the file has: of its nodes, a skinned mesh's bones among them.
         };
 
         virtual ~Importer() = default;

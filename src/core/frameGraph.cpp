@@ -166,6 +166,12 @@ namespace kor {
         }
     }
 
+    ResourceRef<const Framebuffer> FrameGraph::ScreenFramebuffer() const {
+        const Window* window = TargetWindow();
+        if (!window) return {};
+        return ResourceRef<const Framebuffer>(window->DefaultFramebuffer());
+    }
+
     ResourceRef<const Image> PassResources::ImageNamed(const std::string_view name) const {
         if (name == FrameGraph::Screen) return screenOf(_graph.TargetWindow());
         const auto it = _graph._images.find(name);
